@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 
 from django.conf import settings
@@ -12,30 +13,42 @@ from .models import Transaction
 from .services.parser import parse_sms
 from .services.classifier import classify
 
+logger = logging.getLogger('tracker')
+
 
 # ── POST /api/sms/ ────────────────────────────────────────────────────────────
 
 @csrf_exempt
 @require_http_methods(['POST'])
 def sms_webhook(request):
+    logger.info('Webhook received — IP: %s', request.META.get('REMOTE_ADDR'))
+
     secret = request.headers.get('X-Secret', '')
     if secret != settings.SMS_WEBHOOK_SECRET:
+        logger.warning('Unauthorized webhook attempt — wrong secret')
         return JsonResponse({'error': 'unauthorized'}, status=401)
 
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, UnicodeDecodeError):
+        logger.warning('Invalid JSON body: %r', request.body[:200])
         return JsonResponse({'error': 'invalid json'}, status=400)
 
     sms_text = body.get('sms', '').strip()
+    logger.debug('SMS text: %r', sms_text[:100])
+
     if not sms_text:
+        logger.warning('Empty sms field in body')
         return JsonResponse({'error': 'no sms'}, status=400)
 
     parsed = parse_sms(sms_text)
     if parsed is None:
+        logger.warning('Parser returned None — unrecognized format: %r', sms_text[:100])
         return JsonResponse({'error': 'unrecognized sms format'}, status=400)
 
     category = classify(sms_text)
+    logger.info('Parsed OK — type=%s amount=%s merchant=%r category=%s',
+                parsed['type'], parsed['amount'], parsed['merchant'], category)
 
     Transaction.objects.create(
         amount=parsed['amount'],
@@ -47,6 +60,7 @@ def sms_webhook(request):
         raw_sms=parsed['raw_sms'],
     )
 
+    logger.info('Transaction saved successfully')
     return JsonResponse({'status': 'saved', 'category': category})
 
 
