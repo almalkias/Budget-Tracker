@@ -23,7 +23,8 @@ logger = logging.getLogger('tracker')
 def sms_webhook(request):
     logger.info('Webhook received — IP: %s', request.META.get('REMOTE_ADDR'))
 
-    secret = request.headers.get('X-Secret', '')
+    # Accept secret from X-Secret header OR ?secret= query param
+    secret = request.headers.get('X-Secret', '') or request.GET.get('secret', '')
     if secret != settings.SMS_WEBHOOK_SECRET:
         logger.warning('Unauthorized webhook attempt — wrong secret')
         return JsonResponse({'error': 'unauthorized'}, status=401)
@@ -34,11 +35,12 @@ def sms_webhook(request):
         logger.warning('Invalid JSON body: %r', request.body[:200])
         return JsonResponse({'error': 'invalid json'}, status=400)
 
-    sms_text = body.get('sms', '').strip()
+    # Support both 'content' (Forward SMS app) and 'sms' (direct/test)
+    sms_text = (body.get('content') or body.get('sms') or '').strip()
     logger.debug('SMS text: %r', sms_text[:100])
 
     if not sms_text:
-        logger.warning('Empty sms field in body')
+        logger.warning('Empty sms/content field in body')
         return JsonResponse({'error': 'no sms'}, status=400)
 
     parsed = parse_sms(sms_text)
