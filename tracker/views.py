@@ -45,8 +45,8 @@ def sms_webhook(request):
 
     parsed = parse_sms(sms_text)
     if parsed is None:
-        logger.warning('Parser returned None — unrecognized format: %r', sms_text[:100])
-        return JsonResponse({'error': 'unrecognized sms format'}, status=400)
+        logger.info('Skipped — unrecognized format: %r', sms_text[:60])
+        return JsonResponse({'status': 'skipped', 'reason': 'unrecognized format'}, status=200)
 
     category = classify(sms_text)
     logger.info('Parsed OK — type=%s amount=%s merchant=%r category=%s',
