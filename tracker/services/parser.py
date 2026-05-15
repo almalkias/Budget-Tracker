@@ -67,6 +67,21 @@ def parse_sms(sms_text: str) -> dict | None:
         re.DOTALL,
     )
 
+    # ── نمط سداد بطاقة ائتمانية ─────────────────────────────────────────────
+    # سداد بطاقة ائتمانية
+    # من حساب *0102
+    # الى بطاقة **2140
+    # مبلغ SAR 1.00
+    # في 15/05/26 23:56
+    # الصرف المتبقي SAR 1.50
+    credit_card_payment_pattern = re.compile(
+        r'سداد بطاقة ائتمانية'
+        r'.*?مبلغ\s+SAR\s+([\d,]+\.?\d*)'
+        r'.*?في\s+(\d{2}/\d{2}/\d{2,4})'
+        r'(?:.*?الصرف المتبقي\s+SAR\s+([\d,]+\.?\d*))?',
+        re.DOTALL,
+    )
+
     # ── نمط الحوالة بين الحسابات ─────────────────────────────────────────────
     # حوالة بين حساباتك
     # من 0102*  مبلغ 1 SAR  إلى 1110*  في 15/05/26 14:58
@@ -119,6 +134,18 @@ def parse_sms(sms_text: str) -> dict | None:
             'balance': _clean_amount(m.group(4)),
             'date': parse_date(m.group(2)),
             'raw_sms': sms,
+        }
+
+    # محاولة سداد بطاقة ائتمانية
+    m = credit_card_payment_pattern.search(sms)
+    if m:
+        return {
+            'amount':   _clean_amount(m.group(1)),
+            'type':     'debit',
+            'merchant': 'سداد بطاقة ائتمانية',
+            'balance':  _clean_amount(m.group(3)) if m.group(3) else None,
+            'date':     parse_date(m.group(2)),
+            'raw_sms':  sms,
         }
 
     # محاولة الحوالة بين الحسابات
