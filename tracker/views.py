@@ -75,12 +75,12 @@ def sms_webhook(request):
         raw_sms=parsed['raw_sms'],
     )
 
-    if parsed['type'] == 'debit':
+    if is_categorized and parsed['type'] == 'debit':
         updated = BudgetCycle.objects.filter(status='active').update(
             remaining_balance=F('remaining_balance') - Decimal(str(parsed['amount']))
         )
         if updated:
-            logger.info('Cycle decremented by %s', parsed['amount'])
+            logger.info('Cycle decremented by %s (merchant rule match)', parsed['amount'])
 
     logger.info('Transaction saved successfully')
     return JsonResponse({'status': 'saved', 'category': category, 'is_categorized': is_categorized})
@@ -106,6 +106,13 @@ def categorize_transaction(request, tx_id):
     tx.is_categorized = True
     tx.save(update_fields=['category', 'is_categorized'])
 
+    if tx.type == 'debit':
+        updated = BudgetCycle.objects.filter(status='active').update(
+            remaining_balance=F('remaining_balance') - tx.amount
+        )
+        if updated:
+            logger.info('Cycle decremented by %s (manual categorize tx_id=%s)', tx.amount, tx_id)
+
     merchant_rule_saved = False
     merchant = tx.merchant.strip()
     if merchant:
@@ -127,7 +134,7 @@ def delete_transaction(request, tx_id):
     tx = get_object_or_404(Transaction, pk=tx_id)
 
     balance_restored = False
-    if tx.type == 'debit':
+    if tx.type == 'debit' and tx.is_categorized:
         cycle = BudgetCycle.objects.filter(status='active').first()
         if cycle and tx.created_at >= cycle.started_at:
             BudgetCycle.objects.filter(status='active').update(
@@ -270,7 +277,7 @@ def dashboard_api(request):
 
     # Recent transactions — month-filtered (for table)
     recent = []
-    for t in qs.order_by('-created_at')[:20]:
+    for t in qs.filter(is_categorized=True).order_by('-created_at')[:20]:
         recent.append({
             'id':         t.pk,
             'amount':     float(t.amount),
