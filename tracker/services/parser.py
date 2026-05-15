@@ -37,6 +37,20 @@ def parse_sms(sms_text: str) -> dict | None:
         re.DOTALL,
     )
 
+    # ── نمط شراء POS / مدى ──────────────────────────────────────────────────
+    # شراء-POS
+    # بـ192 SAR
+    # من HALA
+    # مدى-ابل*4986
+    # في 15/05/26 18:12
+    pos_pattern = re.compile(
+        r'شراء-POS'
+        r'.*?بـ([\d,]+\.?\d*)\s+SAR'
+        r'.*?من\s+([^\n]+)'
+        r'.*?في\s+(\d{2}/\d{2}/\d{2,4})',
+        re.DOTALL,
+    )
+
     # ── نمط الحوالة بين الحسابات ─────────────────────────────────────────────
     # حوالة بين حساباتك
     # من 0102*  مبلغ 1 SAR  إلى 1110*  في 15/05/26 14:58
@@ -100,6 +114,18 @@ def parse_sms(sms_text: str) -> dict | None:
             'merchant': 'حوالة بين الحسابات',
             'balance': None,
             'date': parse_date(m.group(2)),
+            'raw_sms': sms,
+        }
+
+    # محاولة شراء POS / مدى
+    m = pos_pattern.search(sms)
+    if m:
+        return {
+            'amount': _clean_amount(m.group(1)),
+            'type': 'debit',
+            'merchant': m.group(2).strip(),
+            'balance': None,
+            'date': parse_date(m.group(3)),
             'raw_sms': sms,
         }
 
