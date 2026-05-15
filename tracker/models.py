@@ -57,3 +57,22 @@ class CategoryBudget(models.Model):
 
     def __str__(self):
         return f"{self.category}: {self.monthly_limit or 'بدون حد'}"
+
+
+class BudgetCycle(models.Model):
+    STATUS = [('active', 'Active'), ('closed', 'Closed')]
+
+    month             = models.IntegerField()
+    year              = models.IntegerField()
+    starting_balance  = models.DecimalField(max_digits=12, decimal_places=2)
+    remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
+    total_spent       = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    started_at        = models.DateTimeField()
+    closed_at         = models.DateTimeField(null=True, blank=True)
+    status            = models.CharField(max_length=10, choices=STATUS, default='active')
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"{self.month}/{self.year} — {self.status}"

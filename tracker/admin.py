@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Transaction, MerchantRule, CategoryBudget
+from .models import Transaction, MerchantRule, CategoryBudget, BudgetCycle
 
 
 @admin.register(Transaction)
@@ -23,3 +23,11 @@ class MerchantRuleAdmin(admin.ModelAdmin):
 class CategoryBudgetAdmin(admin.ModelAdmin):
     list_display = ('category', 'monthly_limit', 'updated_at')
     ordering     = ('category',)
+
+
+@admin.register(BudgetCycle)
+class BudgetCycleAdmin(admin.ModelAdmin):
+    list_display    = ('month', 'year', 'status', 'starting_balance', 'remaining_balance', 'total_spent', 'started_at', 'closed_at')
+    list_filter     = ('status',)
+    ordering        = ('-started_at',)
+    readonly_fields = ('started_at', 'closed_at', 'remaining_balance', 'total_spent')
