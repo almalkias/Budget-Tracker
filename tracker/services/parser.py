@@ -37,9 +37,23 @@ def parse_sms(sms_text: str) -> dict | None:
         re.DOTALL,
     )
 
+    # ── نمط الحوالة بين الحسابات ─────────────────────────────────────────────
+    # حوالة بين حساباتك
+    # من 0102*  مبلغ 1 SAR  إلى 1110*  في 15/05/26 14:58
+    internal_transfer_pattern = re.compile(
+        r'حوالة بين حساباتك'
+        r'.*?مبلغ\s+([\d,]+\.?\d*)\s+SAR'
+        r'.*?في\s+(\d{2}/\d{2}/\d{2,4})',
+        re.DOTALL,
+    )
+
     def parse_date(raw: str) -> date:
         d, m, y = raw.split('/')
-        return date(int(y), int(m), int(d))
+        # دعم السنة بصيغتين: YY أو YYYY
+        y = int(y)
+        if y < 100:
+            y += 2000
+        return date(y, int(m), int(d))
 
     # محاولة الإيداع
     m = credit_pattern.search(sms)
@@ -73,6 +87,18 @@ def parse_sms(sms_text: str) -> dict | None:
             'type': 'debit',
             'merchant': m.group(3).strip(),
             'balance': _clean_amount(m.group(4)),
+            'date': parse_date(m.group(2)),
+            'raw_sms': sms,
+        }
+
+    # محاولة الحوالة بين الحسابات
+    m = internal_transfer_pattern.search(sms)
+    if m:
+        return {
+            'amount': _clean_amount(m.group(1)),
+            'type': 'debit',
+            'merchant': 'حوالة بين الحسابات',
+            'balance': None,
             'date': parse_date(m.group(2)),
             'raw_sms': sms,
         }
