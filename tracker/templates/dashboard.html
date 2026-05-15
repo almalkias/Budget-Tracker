@@ -43,33 +43,6 @@
     .header-meta { font-size: .85rem; color: var(--muted); text-align: left; }
 
     /* ── Month picker ─────────────────────────────────────────── */
-    .month-picker {
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: .75rem;
-      padding: .5rem .9rem;
-    }
-    .month-picker select, .month-picker button {
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-family: 'Tajawal', sans-serif;
-      font-size: .95rem;
-      cursor: pointer;
-      outline: none;
-    }
-    .month-picker select option { background: var(--card); }
-    .month-picker button {
-      background: var(--accent);
-      color: #0f172a;
-      border-radius: .5rem;
-      padding: .25rem .75rem;
-      font-weight: 700;
-    }
-    .month-picker button:hover { opacity: .85; }
 
     /* ── Section titles ───────────────────────────────────────── */
     .section-title {
@@ -344,18 +317,6 @@
         آخر تحديث: <span id="last-update">—</span>
       </div>
     </div>
-    <div class="month-picker">
-      <select id="sel-month">
-        <option value="1">يناير</option><option value="2">فبراير</option>
-        <option value="3">مارس</option><option value="4">أبريل</option>
-        <option value="5">مايو</option><option value="6">يونيو</option>
-        <option value="7">يوليو</option><option value="8">أغسطس</option>
-        <option value="9">سبتمبر</option><option value="10">أكتوبر</option>
-        <option value="11">نوفمبر</option><option value="12">ديسمبر</option>
-      </select>
-      <select id="sel-year"></select>
-      <button onclick="loadData()">عرض</button>
-    </div>
   </header>
 
   <div id="error-msg"></div>
@@ -497,22 +458,15 @@
     // ── Init ───────────────────────────────────────────────────
     const now = new Date();
 
-    const selMonth = document.getElementById('sel-month');
-    const selYear  = document.getElementById('sel-year');
-    selMonth.value = now.getMonth() + 1;
-
     const setupMonth = document.getElementById('setup-month');
     const setupYear  = document.getElementById('setup-year');
     setupMonth.value = now.getMonth() + 1;
 
     for (let y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
-      [selYear, setupYear].forEach(sel => {
-        const o = document.createElement('option');
-        o.value = y; o.textContent = y;
-        sel.appendChild(o);
-      });
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y;
+      setupYear.appendChild(o);
     }
-    selYear.value   = now.getFullYear();
     setupYear.value = now.getFullYear();
 
     // ── Helpers ────────────────────────────────────────────────
@@ -826,8 +780,9 @@
 
     // ── Fetch ──────────────────────────────────────────────────
     function loadData(keepPendingCards = false) {
-      const month = selMonth.value;
-      const year  = selYear.value;
+      const _now  = new Date();
+      const month = _now.getMonth() + 1;
+      const year  = _now.getFullYear();
 
       if (!keepPendingCards) {
         document.getElementById('pending-list').innerHTML = '';
