@@ -9,5 +9,6 @@ urlpatterns = [
     path('api/transactions/<int:tx_id>/',            views.delete_transaction,    name='delete_transaction'),
     path('api/cycle/start/',  views.cycle_start,  name='cycle_start'),
     path('api/cycle/close/',  views.cycle_close,  name='cycle_close'),
-    path('api/cycle/update/', views.cycle_update, name='cycle_update'),
+    path('api/cycle/update/',     views.cycle_update, name='cycle_update'),
+    path('api/cycle/reconcile/', views.reconcile,    name='reconcile'),
 ]

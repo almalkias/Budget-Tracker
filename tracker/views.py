@@ -245,6 +245,64 @@ def cycle_update(request):
     })
 
 
+# ── POST /api/cycle/reconcile/ ────────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def reconcile(request):
+    cycle = BudgetCycle.objects.filter(status='active').first()
+    if not cycle:
+        return JsonResponse({'error': 'no active cycle'}, status=400)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'invalid json'}, status=400)
+
+    try:
+        bank_balance = Decimal(str(body['bank_balance']))
+    except Exception:
+        return JsonResponse({'error': 'invalid bank_balance'}, status=400)
+
+    if bank_balance < 0:
+        return JsonResponse({'error': 'invalid value'}, status=400)
+
+    difference = cycle.remaining_balance - bank_balance
+
+    if difference == 0:
+        return JsonResponse({'status': 'matched'})
+
+    tx_type = 'debit' if difference > 0 else 'credit'
+    amount  = abs(difference)
+
+    Transaction.objects.create(
+        amount=amount,
+        type=tx_type,
+        merchant='تسوية يدوية',
+        category='other',
+        is_categorized=True,
+        balance=bank_balance,
+        date=timezone.now().date(),
+        raw_sms='',
+    )
+
+    if tx_type == 'debit':
+        BudgetCycle.objects.filter(status='active').update(
+            remaining_balance=F('remaining_balance') - amount
+        )
+    else:
+        BudgetCycle.objects.filter(status='active').update(
+            remaining_balance=F('remaining_balance') + amount
+        )
+
+    logger.info('Reconciliation — direction=%s amount=%s bank_balance=%s', tx_type, amount, bank_balance)
+    return JsonResponse({
+        'status':    'ok',
+        'difference': float(amount),
+        'direction':  tx_type,
+    })
+
+
 # ── GET /api/dashboard/ ───────────────────────────────────────────────────────
 
 @require_http_methods(['GET'])
