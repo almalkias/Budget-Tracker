@@ -16,7 +16,9 @@ class Transaction(models.Model):
     ]
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    type = models.CharField(max_length=10)
+    TYPES = [('debit', 'خصم'), ('credit', 'إيداع')]
+
+    type = models.CharField(max_length=10, choices=TYPES)
     merchant = models.CharField(max_length=200, blank=True)
     category = models.CharField(max_length=50, choices=CATEGORIES, default='other')
     balance = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
