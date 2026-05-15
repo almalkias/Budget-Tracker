@@ -191,7 +191,7 @@ def cycle_close(request):
 
     total_spent = (
         Transaction.objects
-        .filter(type='debit', created_at__gte=cycle.started_at)
+        .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
         .aggregate(s=Sum('amount'))['s']
     ) or Decimal('0')
 
@@ -229,7 +229,7 @@ def cycle_update(request):
     # Recompute remaining from actual transaction history
     total_spent = (
         Transaction.objects
-        .filter(type='debit', created_at__gte=cycle.started_at)
+        .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
         .aggregate(s=Sum('amount'))['s']
     ) or Decimal('0')
 
