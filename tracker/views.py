@@ -29,15 +29,19 @@ def sms_webhook(request):
         logger.warning('Unauthorized webhook attempt — wrong secret')
         return JsonResponse({'error': 'unauthorized'}, status=401)
 
+    logger.warning('RAW BODY: %r', request.body[:500])
+
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, UnicodeDecodeError):
         logger.warning('Invalid JSON body: %r', request.body[:200])
         return JsonResponse({'error': 'invalid json'}, status=400)
 
-    # Support both 'content' (Forward SMS app) and 'sms' (direct/test)
+    logger.warning('PARSED BODY: %r', body)
+
+    # Support both 'content' (Shortcuts/Forward SMS) and 'sms' (direct/test)
     sms_text = (body.get('content') or body.get('sms') or '').strip()
-    logger.debug('SMS text: %r', sms_text[:100])
+    logger.warning('SMS TEXT: %r', sms_text[:200])
 
     if not sms_text:
         logger.warning('Empty sms/content field in body')
