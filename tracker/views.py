@@ -119,7 +119,26 @@ def categorize_transaction(request, tx_id):
     return JsonResponse({'status': 'ok', 'merchant_rule_saved': merchant_rule_saved})
 
 
-# ── POST /api/cycle/start/ ────────────────────────────────────────────────────
+# ── DELETE /api/transactions/<id>/ ───────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['DELETE'])
+def delete_transaction(request, tx_id):
+    tx = get_object_or_404(Transaction, pk=tx_id)
+
+    balance_restored = False
+    if tx.type == 'debit':
+        cycle = BudgetCycle.objects.filter(status='active').first()
+        if cycle and tx.created_at >= cycle.started_at:
+            BudgetCycle.objects.filter(status='active').update(
+                remaining_balance=F('remaining_balance') + tx.amount
+            )
+            balance_restored = True
+            logger.info('Balance restored — tx_id=%s amount=%s', tx_id, tx.amount)
+
+    tx.delete()
+    logger.info('Transaction deleted — id=%s', tx_id)
+    return JsonResponse({'status': 'deleted', 'balance_restored': balance_restored})
 
 @csrf_exempt
 @require_http_methods(['POST'])

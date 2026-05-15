@@ -206,6 +206,21 @@
     }
     .edit-balance-panel input:focus { border-color: var(--accent); }
 
+    /* ── Delete button ────────────────────────────────────────── */
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: .2rem .4rem;
+      border-radius: .3rem;
+      transition: color .15s, background .15s;
+    }
+    .btn-delete:hover { color: var(--red); background: #7f1d1d22; }
+    tr.removing { opacity: 0; transition: opacity .25s ease; }
+
     /* ── Summary cards ────────────────────────────────────────── */
     .cards {
       display: grid;
@@ -431,6 +446,7 @@
             <th>النوع</th>
             <th>المبلغ</th>
             <th>الرصيد</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="tx-body"></tbody>
@@ -701,15 +717,17 @@
           const catLabel  = CAT_MAP[t.category] || t.category;
           const typeLabel = t.type === 'debit' ? 'خصم' : 'إيداع';
           const sign      = t.type === 'debit' ? '−' : '+';
-          tbody.innerHTML += `
-            <tr>
+          const tr = document.createElement('tr');
+          tr.dataset.id = t.id;
+          tr.innerHTML = `
               <td style="color:var(--muted)">${t.date || t.created_at}</td>
               <td>${t.merchant || '—'}</td>
               <td><span class="badge cat-${t.category}">${catLabel}</span></td>
               <td class="${t.type === 'debit' ? 'type-debit' : 'type-credit'}">${typeLabel}</td>
               <td style="font-weight:700;color:${t.type==='debit'?'var(--red)':'var(--green)'}">${sign} ${fmt(t.amount)}</td>
               <td style="color:var(--muted)">${t.balance != null ? fmt(t.balance) : '—'}</td>
-            </tr>`;
+              <td><button class="btn-delete" onclick="deleteTransaction(${t.id}, this.closest('tr'))">✕</button></td>`;
+          tbody.appendChild(tr);
         });
       }
 
@@ -717,6 +735,21 @@
 
       document.getElementById('loader').style.display  = 'none';
       document.getElementById('content').style.display = 'block';
+    }
+
+    // ── Delete transaction ─────────────────────────────────────
+    async function deleteTransaction(txId, rowEl) {
+      if (!confirm('حذف هذه العملية؟')) return;
+      rowEl.classList.add('removing');
+      try {
+        const r = await fetch(`/api/transactions/${txId}/`, {method: 'DELETE'});
+        const d = await r.json();
+        if (!r.ok) { rowEl.classList.remove('removing'); alert(d.error || 'خطأ في الحذف'); return; }
+        setTimeout(() => { rowEl.remove(); loadData(true); }, 250);
+      } catch {
+        rowEl.classList.remove('removing');
+        alert('خطأ في الاتصال');
+      }
     }
 
     // ── Fetch ──────────────────────────────────────────────────
