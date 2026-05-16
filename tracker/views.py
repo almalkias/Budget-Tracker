@@ -87,10 +87,13 @@ def categorize_transaction(request, tx_id):
     if not category:
         return JsonResponse({'error': 'invalid category'}, status=400)
 
+    active_cycle = BudgetCycle.objects.filter(status='active').first()
+
     tx.category       = category
     tx.is_categorized = True
-    tx.save(update_fields=['category', 'is_categorized'])
-    logger.info('Transaction categorized — id=%s category=%s', tx_id, category)
+    tx.cycle          = active_cycle
+    tx.save(update_fields=['category', 'is_categorized', 'cycle'])
+    logger.info('Transaction categorized — id=%s category=%s cycle=%s', tx_id, category, active_cycle and active_cycle.pk)
     return JsonResponse({'status': 'ok'})
 
 
@@ -161,7 +164,7 @@ def cycle_close(request):
 
     total_spent = (
         Transaction.objects
-        .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
+        .filter(type='debit', is_categorized=True, cycle=cycle)
         .aggregate(s=Sum('amount'))['s']
     ) or Decimal('0')
 
@@ -214,7 +217,7 @@ def dashboard_api(request):
     cycle = BudgetCycle.objects.filter(status='active').first()
 
     if cycle:
-        qs    = Transaction.objects.filter(created_at__gte=cycle.started_at, is_skipped=False)
+        qs    = Transaction.objects.filter(cycle=cycle, is_skipped=False)
         month = cycle.month
         year  = cycle.year
     else:
@@ -271,7 +274,7 @@ def dashboard_api(request):
     if cycle:
         total_expenses = (
             Transaction.objects
-            .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
+            .filter(type='debit', is_categorized=True, cycle=cycle)
             .aggregate(s=Sum('amount'))['s']
         ) or Decimal('0')
         spending_percentage = (
@@ -299,8 +302,7 @@ def dashboard_api(request):
         )
         cat_rows = list(
             Transaction.objects
-            .filter(type='debit', is_categorized=True,
-                    created_at__gte=c.started_at, created_at__lte=c.closed_at)
+            .filter(type='debit', is_categorized=True, cycle=c)
             .values('category')
             .annotate(total=Sum('amount'))
             .order_by('-total')

@@ -4,8 +4,8 @@ from .models import Transaction, CategoryBudget, BudgetCycle
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display    = ('date', 'merchant', 'category', 'type', 'amount', 'is_categorized', 'is_skipped', 'balance', 'created_at')
-    list_filter     = ('type', 'category', 'is_categorized', 'is_skipped')
+    list_display    = ('date', 'merchant', 'category', 'type', 'amount', 'is_categorized', 'is_skipped', 'cycle', 'balance', 'created_at')
+    list_filter     = ('type', 'category', 'is_categorized', 'is_skipped', 'cycle')
     search_fields   = ('merchant', 'raw_sms')
     ordering        = ('-created_at',)
     readonly_fields = ('raw_sms', 'created_at')

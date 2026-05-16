@@ -23,6 +23,8 @@ class Transaction(models.Model):
     category       = models.CharField(max_length=50, choices=CATEGORIES, default='other')
     is_categorized = models.BooleanField(default=False)
     is_skipped     = models.BooleanField(default=False)
+    cycle          = models.ForeignKey('BudgetCycle', null=True, blank=True,
+                                       on_delete=models.SET_NULL, related_name='transactions')
     balance        = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     date           = models.DateField(null=True, blank=True)
     raw_sms        = models.TextField()
