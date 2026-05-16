@@ -514,7 +514,7 @@
       const open  = panel.style.display === 'flex';
       panel.style.display = open ? 'none' : 'flex';
       if (!open && currentCycle) {
-        document.getElementById('new-balance').value = currentCycle.remaining_balance;
+        document.getElementById('new-balance').value = currentCycle.salary;
       }
     }
 
@@ -525,7 +525,7 @@
         const r = await fetch('/api/cycle/update/', {
           method: 'PATCH',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({remaining_balance: val}),
+          body: JSON.stringify({salary: val}),
         });
         const d = await r.json();
         if (!r.ok) { alert(d.error || 'خطأ'); return; }
@@ -623,7 +623,7 @@
       if (cycle) {
         setup.style.display  = 'none';
         active.style.display = 'block';
-        document.getElementById('remaining-balance').textContent = fmt(cycle.remaining_balance);
+        document.getElementById('remaining-balance').textContent = fmt(cycle.salary);
         document.getElementById('cycle-spent').textContent       = fmt(cycle.total_expenses);
         document.getElementById('tx-count').textContent          = cycle.tx_count;
         const pctEl = document.getElementById('spending-pct');
@@ -659,7 +659,7 @@
           <div class="history-row">
             <span class="history-month">${monthLabel(c.month, c.year)}</span>
             <div class="history-stats">
-              <span>ابتدائي: ${fmt(c.starting_balance)}</span>
+              <span>الراتب: ${fmt(c.salary)}</span>
               <span class="neg">مصروف: ${spent}</span>
               ${saved}
             </div>

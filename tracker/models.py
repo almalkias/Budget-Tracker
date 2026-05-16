@@ -62,14 +62,13 @@ class CategoryBudget(models.Model):
 class BudgetCycle(models.Model):
     STATUS = [('active', 'Active'), ('closed', 'Closed')]
 
-    month             = models.IntegerField()
-    year              = models.IntegerField()
-    starting_balance  = models.DecimalField(max_digits=12, decimal_places=2)
-    remaining_balance = models.DecimalField(max_digits=12, decimal_places=2)
-    total_spent       = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    started_at        = models.DateTimeField()
-    closed_at         = models.DateTimeField(null=True, blank=True)
-    status            = models.CharField(max_length=10, choices=STATUS, default='active')
+    month       = models.IntegerField()
+    year        = models.IntegerField()
+    salary      = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_spent = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    started_at  = models.DateTimeField()
+    closed_at   = models.DateTimeField(null=True, blank=True)
+    status      = models.CharField(max_length=10, choices=STATUS, default='active')
 
     class Meta:
         ordering = ['-started_at']

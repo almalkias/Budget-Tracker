@@ -8,7 +8,7 @@ from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.db.models import Sum, F
+from django.db.models import Sum
 
 from .models import Transaction, MerchantRule, CategoryBudget, BudgetCycle
 from .services.parser import parse_sms
@@ -75,13 +75,6 @@ def sms_webhook(request):
         raw_sms=parsed['raw_sms'],
     )
 
-    if is_categorized and parsed['type'] == 'debit':
-        updated = BudgetCycle.objects.filter(status='active').update(
-            remaining_balance=F('remaining_balance') - Decimal(str(parsed['amount']))
-        )
-        if updated:
-            logger.info('Cycle decremented by %s (merchant rule match)', parsed['amount'])
-
     logger.info('Transaction saved successfully')
     return JsonResponse({'status': 'saved', 'category': category, 'is_categorized': is_categorized})
 
@@ -106,13 +99,6 @@ def categorize_transaction(request, tx_id):
     tx.is_categorized = True
     tx.save(update_fields=['category', 'is_categorized'])
 
-    if tx.type == 'debit':
-        updated = BudgetCycle.objects.filter(status='active').update(
-            remaining_balance=F('remaining_balance') - tx.amount
-        )
-        if updated:
-            logger.info('Cycle decremented by %s (manual categorize tx_id=%s)', tx.amount, tx_id)
-
     merchant_rule_saved = False
     merchant = tx.merchant.strip()
     if merchant:
@@ -133,19 +119,9 @@ def categorize_transaction(request, tx_id):
 def delete_transaction(request, tx_id):
     tx = get_object_or_404(Transaction, pk=tx_id)
 
-    balance_restored = False
-    if tx.type == 'debit' and tx.is_categorized:
-        cycle = BudgetCycle.objects.filter(status='active').first()
-        if cycle and tx.created_at >= cycle.started_at:
-            BudgetCycle.objects.filter(status='active').update(
-                remaining_balance=F('remaining_balance') + tx.amount
-            )
-            balance_restored = True
-            logger.info('Balance restored — tx_id=%s amount=%s', tx_id, tx.amount)
-
     tx.delete()
     logger.info('Transaction deleted — id=%s', tx_id)
-    return JsonResponse({'status': 'deleted', 'balance_restored': balance_restored})
+    return JsonResponse({'status': 'deleted'})
 
 @csrf_exempt
 @require_http_methods(['POST'])
@@ -159,24 +135,23 @@ def cycle_start(request):
         return JsonResponse({'error': 'invalid json'}, status=400)
 
     try:
-        starting_balance = Decimal(str(body['starting_balance']))
-        month = int(body['month'])
-        year  = int(body['year'])
+        salary = Decimal(str(body['starting_balance']))
+        month  = int(body['month'])
+        year   = int(body['year'])
     except Exception:
         return JsonResponse({'error': 'invalid fields'}, status=400)
 
-    if starting_balance <= 0 or not (1 <= month <= 12):
+    if salary <= 0 or not (1 <= month <= 12):
         return JsonResponse({'error': 'invalid values'}, status=400)
 
     cycle = BudgetCycle.objects.create(
         month=month,
         year=year,
-        starting_balance=starting_balance,
-        remaining_balance=starting_balance,
+        salary=salary,
         started_at=timezone.now(),
         status='active',
     )
-    logger.info('Cycle started — id=%s month=%s/%s balance=%s', cycle.pk, month, year, starting_balance)
+    logger.info('Cycle started — id=%s month=%s/%s salary=%s', cycle.pk, month, year, salary)
     return JsonResponse({'status': 'created', 'id': cycle.pk})
 
 
@@ -219,20 +194,20 @@ def cycle_update(request):
         return JsonResponse({'error': 'invalid json'}, status=400)
 
     try:
-        new_remaining = Decimal(str(body['remaining_balance']))
+        new_salary = Decimal(str(body['salary']))
     except Exception:
-        return JsonResponse({'error': 'invalid remaining_balance'}, status=400)
+        return JsonResponse({'error': 'invalid salary'}, status=400)
 
-    if new_remaining < 0:
+    if new_salary < 0:
         return JsonResponse({'error': 'invalid value'}, status=400)
 
-    cycle.remaining_balance = new_remaining
-    cycle.save(update_fields=['remaining_balance'])
+    cycle.salary = new_salary
+    cycle.save(update_fields=['salary'])
 
-    logger.info('Cycle updated — id=%s remaining=%s', cycle.pk, new_remaining)
+    logger.info('Cycle salary updated — id=%s salary=%s', cycle.pk, new_salary)
     return JsonResponse({
-        'status':            'updated',
-        'remaining_balance': float(new_remaining),
+        'status': 'updated',
+        'salary': float(new_salary),
     })
 
 
@@ -303,17 +278,15 @@ def dashboard_api(request):
             .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
             .aggregate(s=Sum('amount'))['s']
         ) or Decimal('0')
-        salary = cycle.remaining_balance
         spending_percentage = (
-            round(float(total_expenses / salary) * 100, 1)
-            if salary > 0 else None
+            round(float(total_expenses / cycle.salary) * 100, 1)
+            if cycle.salary > 0 else None
         )
         active_cycle = {
             'id':                  cycle.pk,
             'month':               cycle.month,
             'year':                cycle.year,
-            'starting_balance':    float(cycle.starting_balance),
-            'remaining_balance':   float(cycle.remaining_balance),
+            'salary':              float(cycle.salary),
             'total_expenses':      float(total_expenses),
             'spending_percentage': spending_percentage,
             'tx_count':            qs.count(),
@@ -325,13 +298,13 @@ def dashboard_api(request):
     for c in BudgetCycle.objects.filter(status='closed').order_by('-started_at'):
         spent = float(c.total_spent) if c.total_spent is not None else None
         cycle_history.append({
-            'id':               c.pk,
-            'month':            c.month,
-            'year':             c.year,
-            'starting_balance': float(c.starting_balance),
-            'total_spent':      spent,
-            'saved':            round(float(c.starting_balance) - spent, 2) if spent is not None else None,
-            'closed_at':        c.closed_at.strftime('%Y-%m-%d') if c.closed_at else None,
+            'id':          c.pk,
+            'month':       c.month,
+            'year':        c.year,
+            'salary':      float(c.salary),
+            'total_spent': spent,
+            'saved':       round(float(c.salary) - spent, 2) if spent is not None else None,
+            'closed_at':   c.closed_at.strftime('%Y-%m-%d') if c.closed_at else None,
         })
 
     return JsonResponse({

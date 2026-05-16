@@ -27,7 +27,7 @@ class CategoryBudgetAdmin(admin.ModelAdmin):
 
 @admin.register(BudgetCycle)
 class BudgetCycleAdmin(admin.ModelAdmin):
-    list_display    = ('month', 'year', 'status', 'starting_balance', 'remaining_balance', 'total_spent', 'started_at', 'closed_at')
+    list_display    = ('month', 'year', 'status', 'salary', 'total_spent', 'started_at', 'closed_at')
     list_filter     = ('status',)
     ordering        = ('-started_at',)
-    readonly_fields = ('started_at', 'closed_at', 'remaining_balance', 'total_spent')
+    readonly_fields = ('started_at', 'closed_at', 'total_spent')
