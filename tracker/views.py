@@ -298,13 +298,18 @@ def dashboard_api(request):
     # Active cycle — cycle-scoped summary cards
     active_cycle = None
     if cycle:
+        total_expenses = (
+            Transaction.objects
+            .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
+            .aggregate(s=Sum('amount'))['s']
+        ) or Decimal('0')
         active_cycle = {
             'id':                cycle.pk,
             'month':             cycle.month,
             'year':              cycle.year,
             'starting_balance':  float(cycle.starting_balance),
             'remaining_balance': float(cycle.remaining_balance),
-            'total_spent':       float(cycle.starting_balance - cycle.remaining_balance),
+            'total_expenses':    float(total_expenses),
             'tx_count':          qs.count(),
             'started_at':        cycle.started_at.strftime('%Y-%m-%d %H:%M'),
         }
