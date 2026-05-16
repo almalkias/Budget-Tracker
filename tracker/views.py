@@ -260,7 +260,7 @@ def dashboard_api(request):
 
     # Pending — global, all uncategorized non-skipped transactions
     pending = []
-    for t in Transaction.objects.filter(is_categorized=False, is_skipped=False).order_by('date', 'created_at'):
+    for t in Transaction.objects.filter(is_categorized=False, is_skipped=False).order_by('created_at'):
         pending.append({
             'id':      t.pk,
             'amount':  float(t.amount),
