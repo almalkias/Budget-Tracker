@@ -283,10 +283,33 @@
       font-size: .9rem;
     }
     .history-month { font-weight: 700; color: var(--text); min-width: 100px; }
-    .history-stats { display: flex; gap: 1.25rem; flex-wrap: wrap; }
+    .history-stats { display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: center; }
     .history-stats span { color: var(--muted); }
     .history-stats .neg { color: var(--red); }
     .history-stats .pos { color: var(--green); }
+    .history-row { cursor: pointer; user-select: none; transition: border-color .15s; }
+    .history-row:hover { border-color: var(--accent); }
+    .expand-icon { color: var(--muted); font-size: .85rem; transition: transform .2s; display: inline-block; margin-right: auto; }
+    .history-item { margin-bottom: .6rem; }
+    .history-item .history-row { margin-bottom: 0; border-radius: .75rem; }
+    .history-item .history-row.open { border-radius: .75rem .75rem 0 0; border-bottom-color: transparent; }
+    .cycle-breakdown {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 .75rem .75rem;
+      padding: .6rem 1.1rem;
+    }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: .35rem 0;
+      font-size: .85rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-cat    { color: var(--text); }
+    .breakdown-amount { color: var(--muted); }
 
     /* ── Loader / error ───────────────────────────────────────── */
     #loader { text-align: center; padding: 3rem; color: var(--muted); font-size: 1.1rem; }
@@ -643,6 +666,35 @@
     }
 
     // ── Cycle history render ───────────────────────────────────
+    let expandedCycleId = null;
+
+    function toggleCycleBreakdown(cycleId) {
+      const panel = document.getElementById(`breakdown-${cycleId}`);
+      const row   = document.getElementById(`history-row-${cycleId}`);
+      const icon  = document.getElementById(`expand-icon-${cycleId}`);
+      if (!panel) return;
+
+      if (expandedCycleId === cycleId) {
+        panel.style.display = 'none';
+        row.classList.remove('open');
+        icon.style.transform = '';
+        expandedCycleId = null;
+        return;
+      }
+      if (expandedCycleId !== null) {
+        const prev     = document.getElementById(`breakdown-${expandedCycleId}`);
+        const prevRow  = document.getElementById(`history-row-${expandedCycleId}`);
+        const prevIcon = document.getElementById(`expand-icon-${expandedCycleId}`);
+        if (prev)     prev.style.display = 'none';
+        if (prevRow)  prevRow.classList.remove('open');
+        if (prevIcon) prevIcon.style.transform = '';
+      }
+      panel.style.display = 'block';
+      row.classList.add('open');
+      icon.style.transform = 'rotate(180deg)';
+      expandedCycleId = cycleId;
+    }
+
     function renderCycleHistory(cycles) {
       const section = document.getElementById('cycle-history-section');
       const list    = document.getElementById('cycle-history-list');
@@ -650,18 +702,36 @@
 
       section.style.display = 'block';
       list.innerHTML = '';
+      expandedCycleId = null;
       cycles.forEach(c => {
         const spent = c.total_spent !== null ? fmt(c.total_spent) : '—';
-        const saved = c.saved !== null
-          ? `<span class="${c.saved >= 0 ? 'pos' : 'neg'}">وفّرت: ${fmt(Math.abs(c.saved))}</span>`
-          : '';
+        let pctHtml = '';
+        if (c.spending_percentage !== null) {
+          const p     = c.spending_percentage;
+          const color = p > 90 ? 'var(--red)' : p >= 70 ? 'var(--yellow)' : 'var(--green)';
+          pctHtml = `<span style="color:${color};font-weight:700">${p.toLocaleString('ar-SA')}٪</span>`;
+        }
+        const breakdownRows = c.by_category.length
+          ? c.by_category.map(r =>
+              `<div class="breakdown-row">
+                <span class="breakdown-cat">${CAT_MAP[r.category] || r.category}</span>
+                <span class="breakdown-amount">${fmt(r.total)}</span>
+              </div>`).join('')
+          : `<span style="color:var(--muted);font-size:.85rem">لا توجد مصروفات</span>`;
+
         list.innerHTML += `
-          <div class="history-row">
-            <span class="history-month">${monthLabel(c.month, c.year)}</span>
-            <div class="history-stats">
-              <span>الراتب: ${fmt(c.salary)}</span>
-              <span class="neg">مصروف: ${spent}</span>
-              ${saved}
+          <div class="history-item">
+            <div class="history-row" id="history-row-${c.id}" onclick="toggleCycleBreakdown(${c.id})">
+              <span class="history-month">${monthLabel(c.month, c.year)}</span>
+              <div class="history-stats">
+                <span>الراتب: ${fmt(c.salary)}</span>
+                <span class="neg">مصروف: ${spent}</span>
+                ${pctHtml}
+              </div>
+              <span class="expand-icon" id="expand-icon-${c.id}">▾</span>
+            </div>
+            <div class="cycle-breakdown" id="breakdown-${c.id}" style="display:none">
+              ${breakdownRows}
             </div>
           </div>`;
       });

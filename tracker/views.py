@@ -297,14 +297,29 @@ def dashboard_api(request):
     cycle_history = []
     for c in BudgetCycle.objects.filter(status='closed').order_by('-started_at'):
         spent = float(c.total_spent) if c.total_spent is not None else None
+        spending_pct = (
+            round(spent / float(c.salary) * 100, 1)
+            if c.salary > 0 and spent is not None else None
+        )
+        cat_rows = list(
+            Transaction.objects
+            .filter(type='debit', is_categorized=True,
+                    created_at__gte=c.started_at, created_at__lte=c.closed_at)
+            .values('category')
+            .annotate(total=Sum('amount'))
+            .order_by('-total')
+        )
+        for row in cat_rows:
+            row['total'] = float(row['total'])
         cycle_history.append({
-            'id':          c.pk,
-            'month':       c.month,
-            'year':        c.year,
-            'salary':      float(c.salary),
-            'total_spent': spent,
-            'saved':       round(float(c.salary) - spent, 2) if spent is not None else None,
-            'closed_at':   c.closed_at.strftime('%Y-%m-%d') if c.closed_at else None,
+            'id':                  c.pk,
+            'month':               c.month,
+            'year':                c.year,
+            'salary':              float(c.salary),
+            'total_spent':         spent,
+            'spending_percentage': spending_pct,
+            'by_category':         cat_rows,
+            'closed_at':           c.closed_at.strftime('%Y-%m-%d') if c.closed_at else None,
         })
 
     return JsonResponse({
