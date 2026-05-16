@@ -209,9 +209,11 @@
     }
     .card .label { font-size: .8rem; color: var(--muted); margin-bottom: .4rem; }
     .card .value { font-size: 1.6rem; font-weight: 700; }
-    .card .value.remaining { color: var(--accent); }
-    .card .value.spent     { color: var(--red); }
-    .card .value.count     { color: var(--yellow); }
+    .card .value.remaining  { color: var(--accent); }
+    .card .value.spent      { color: var(--red); }
+    .card .value.count      { color: var(--yellow); }
+    .card .value.pct-green  { color: var(--green); }
+    .card .value.pct-yellow { color: var(--yellow); }
 
     /* ── Bar chart ────────────────────────────────────────────── */
     .chart-wrap { margin-bottom: 1.75rem; }
@@ -336,7 +338,7 @@
       <div class="setup-card">
         <div class="setup-fields">
           <div class="setup-field">
-            <label>الرصيد الابتدائي (ر.س)</label>
+            <label>الراتب (ر.س)</label>
             <input type="number" id="setup-balance" min="1" step="0.01" />
           </div>
           <div class="setup-field">
@@ -362,7 +364,7 @@
     <div id="cycle-active" style="display:none">
       <div class="cards">
         <div class="card">
-          <div class="label">الرصيد المتبقي</div>
+          <div class="label">الراتب</div>
           <div class="value remaining" id="remaining-balance">—</div>
         </div>
         <div class="card">
@@ -370,16 +372,20 @@
           <div class="value spent" id="cycle-spent">—</div>
         </div>
         <div class="card">
+          <div class="label">نسبة المصروف</div>
+          <div class="value" id="spending-pct">—</div>
+        </div>
+        <div class="card">
           <div class="label">عدد العمليات</div>
           <div class="value count" id="tx-count">—</div>
         </div>
       </div>
       <div class="cycle-controls">
-        <button class="btn btn-ghost" onclick="toggleEditBalance()">تعديل الرصيد</button>
+        <button class="btn btn-ghost" onclick="toggleEditBalance()">تعديل الراتب</button>
         <button class="btn btn-danger" onclick="closeCycle()">أوقف الحساب</button>
       </div>
       <div class="edit-balance-panel" id="edit-balance-panel">
-        <input type="number" id="new-balance" min="0" step="0.01" placeholder="الرصيد الجديد" />
+        <input type="number" id="new-balance" min="0" step="0.01" placeholder="الراتب الجديد" />
         <button class="btn btn-primary" onclick="updateBalance()">حفظ</button>
         <button class="btn btn-ghost" onclick="toggleEditBalance()">إلغاء</button>
       </div>
@@ -620,6 +626,15 @@
         document.getElementById('remaining-balance').textContent = fmt(cycle.remaining_balance);
         document.getElementById('cycle-spent').textContent       = fmt(cycle.total_expenses);
         document.getElementById('tx-count').textContent          = cycle.tx_count;
+        const pctEl = document.getElementById('spending-pct');
+        if (cycle.spending_percentage === null) {
+          pctEl.textContent = '—';
+          pctEl.className   = 'value';
+        } else {
+          pctEl.textContent = cycle.spending_percentage.toLocaleString('ar-SA') + '٪';
+          const p = cycle.spending_percentage;
+          pctEl.className = 'value ' + (p > 90 ? 'spent' : p >= 70 ? 'pct-yellow' : 'pct-green');
+        }
       } else {
         setup.style.display  = 'block';
         active.style.display = 'none';

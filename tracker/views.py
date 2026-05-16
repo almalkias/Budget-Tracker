@@ -303,15 +303,21 @@ def dashboard_api(request):
             .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
             .aggregate(s=Sum('amount'))['s']
         ) or Decimal('0')
+        salary = cycle.remaining_balance
+        spending_percentage = (
+            round(float(total_expenses / salary) * 100, 1)
+            if salary > 0 else None
+        )
         active_cycle = {
-            'id':                cycle.pk,
-            'month':             cycle.month,
-            'year':              cycle.year,
-            'starting_balance':  float(cycle.starting_balance),
-            'remaining_balance': float(cycle.remaining_balance),
-            'total_expenses':    float(total_expenses),
-            'tx_count':          qs.count(),
-            'started_at':        cycle.started_at.strftime('%Y-%m-%d %H:%M'),
+            'id':                  cycle.pk,
+            'month':               cycle.month,
+            'year':                cycle.year,
+            'starting_balance':    float(cycle.starting_balance),
+            'remaining_balance':   float(cycle.remaining_balance),
+            'total_expenses':      float(total_expenses),
+            'spending_percentage': spending_percentage,
+            'tx_count':            qs.count(),
+            'started_at':          cycle.started_at.strftime('%Y-%m-%d %H:%M'),
         }
 
     # Closed cycle history
