@@ -82,10 +82,38 @@
       justify-content: space-between;
       margin-bottom: .4rem;
     }
-    .pending-merchant { font-size: 1rem; font-weight: 700; }
-    .pending-amount   { font-size: 1.15rem; font-weight: 700; color: var(--red); }
-    .pending-date     { font-size: .8rem; color: var(--muted); margin-bottom: .75rem; }
-    .cat-buttons      { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .pending-meta   { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .5rem; }
+    .pending-amount { font-size: 1.15rem; font-weight: 700; }
+    .pending-date   { font-size: .8rem; color: var(--muted); }
+    .pending-raw {
+      font-family: 'Tajawal', sans-serif;
+      font-size: .78rem;
+      color: var(--muted);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: .4rem;
+      padding: .5rem .75rem;
+      margin-bottom: .75rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      direction: rtl;
+      text-align: right;
+      line-height: 1.5;
+    }
+    .cat-buttons { display: flex; flex-wrap: wrap; gap: .4rem; }
+    .btn-skip {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: .5rem;
+      padding: .25rem .75rem;
+      font-family: 'Tajawal', sans-serif;
+      font-size: .82rem;
+      cursor: pointer;
+      margin-top: .5rem;
+      transition: color .15s, border-color .15s;
+    }
+    .btn-skip:hover { color: var(--yellow); border-color: var(--yellow); }
     .cat-btn {
       background: #1e3a5f;
       border: 1px solid #2563eb44;
@@ -557,6 +585,29 @@
       } catch { alert('خطأ في الاتصال'); }
     }
 
+    // ── Helpers ────────────────────────────────────────────────
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ── Skip transaction ───────────────────────────────────────
+    function skipTransaction(txId, cardEl) {
+      cardEl.classList.add('hiding');
+      fetch(`/api/transactions/${txId}/skip/`, {method: 'POST'})
+        .then(r => r.json())
+        .then(() => {
+          setTimeout(() => {
+            cardEl.remove();
+            const remaining = document.querySelectorAll('.pending-card').length;
+            document.getElementById('pending-badge').textContent = remaining;
+            if (remaining === 0) document.getElementById('pending-section').style.display = 'none';
+          }, 300);
+        })
+        .catch(() => { cardEl.classList.remove('hiding'); alert('فشل التجاهل، حاول مجدداً'); });
+    }
+
     // ── Custom category input ──────────────────────────────────
     function showCustomCategoryInput(txId, cardEl) {
       const existing = cardEl.querySelector('.custom-cat-form');
@@ -618,21 +669,30 @@
 
       pending.forEach(tx => {
         if (existing.has(String(tx.id))) return;
+
+        const isDebit    = tx.type === 'debit';
+        const amountStr  = tx.amount > 0
+          ? `${isDebit ? '−' : '+'} ${fmt(tx.amount)}`
+          : 'غير معروف';
+        const amountColor = isDebit ? 'var(--red)' : 'var(--green)';
+
         const btns = CATEGORIES.map(c =>
           `<button class="cat-btn" onclick="categorize(${tx.id},'${c.key}',this.closest('.pending-card'))">${c.label}</button>`
         ).join('') +
           `<button class="cat-btn" style="border-color:#475569;color:var(--muted);"
                    onclick="showCustomCategoryInput(${tx.id},this.closest('.pending-card'))">إدخال يدوي</button>`;
+
         const card = document.createElement('div');
         card.className  = 'pending-card';
         card.dataset.id = tx.id;
         card.innerHTML  = `
-          <div class="pending-card-top">
-            <span class="pending-merchant">${tx.merchant}</span>
-            <span class="pending-amount">− ${fmt(tx.amount)}</span>
+          <div class="pending-meta">
+            <span class="pending-amount" style="color:${amountColor}">${amountStr}</span>
+            <span class="pending-date">${tx.date || '—'}</span>
           </div>
-          <div class="pending-date">${tx.date || '—'}</div>
-          <div class="cat-buttons">${btns}</div>`;
+          <pre class="pending-raw">${escapeHtml(tx.raw_sms || '')}</pre>
+          <div class="cat-buttons">${btns}</div>
+          <button class="btn-skip" onclick="skipTransaction(${tx.id}, this.closest('.pending-card'))">تجاهل</button>`;
         list.appendChild(card);
       });
     }

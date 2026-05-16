@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Sum
 
-from .models import Transaction, MerchantRule, CategoryBudget, BudgetCycle
+from .models import Transaction, CategoryBudget, BudgetCycle
 from .services.parser import parse_sms
 
 logger = logging.getLogger('tracker')
@@ -43,40 +43,32 @@ def sms_webhook(request):
         return JsonResponse({'error': 'no sms'}, status=400)
 
     parsed = parse_sms(sms_text)
-    if parsed is None:
-        logger.info('Skipped — unrecognized format: %r', sms_text[:60])
-        return JsonResponse({'status': 'skipped', 'reason': 'unrecognized format'}, status=200)
-
-    if parsed['type'] == 'credit':
-        category       = 'other'
-        is_categorized = True
+    if parsed is not None:
+        Transaction.objects.create(
+            amount=parsed['amount'],
+            type=parsed['type'],
+            merchant=parsed['merchant'],
+            category='other',
+            is_categorized=False,
+            balance=parsed['balance'],
+            date=parsed['date'],
+            raw_sms=parsed['raw_sms'],
+        )
+        logger.info('Transaction saved — type=%s amount=%s', parsed['type'], parsed['amount'])
     else:
-        merchant = parsed['merchant'].strip()
-        rule     = MerchantRule.objects.filter(merchant__iexact=merchant).first() if merchant else None
-        if rule:
-            category       = rule.category
-            is_categorized = True
-            logger.info('Merchant rule hit — merchant=%r category=%s', merchant, category)
-        else:
-            category       = 'other'
-            is_categorized = False
+        Transaction.objects.create(
+            amount=Decimal('0'),
+            type='debit',
+            merchant='',
+            category='other',
+            is_categorized=False,
+            balance=None,
+            date=None,
+            raw_sms=sms_text,
+        )
+        logger.info('Unrecognized format — saved raw SMS for manual review')
 
-    logger.info('Parsed OK — type=%s amount=%s merchant=%r category=%s categorized=%s',
-                parsed['type'], parsed['amount'], parsed['merchant'], category, is_categorized)
-
-    Transaction.objects.create(
-        amount=parsed['amount'],
-        type=parsed['type'],
-        merchant=parsed['merchant'],
-        category=category,
-        is_categorized=is_categorized,
-        balance=parsed['balance'],
-        date=parsed['date'],
-        raw_sms=parsed['raw_sms'],
-    )
-
-    logger.info('Transaction saved successfully')
-    return JsonResponse({'status': 'saved', 'category': category, 'is_categorized': is_categorized})
+    return JsonResponse({'status': 'saved'})
 
 
 # ── POST /api/transactions/<id>/categorize/ ───────────────────────────────────
@@ -98,18 +90,8 @@ def categorize_transaction(request, tx_id):
     tx.category       = category
     tx.is_categorized = True
     tx.save(update_fields=['category', 'is_categorized'])
-
-    merchant_rule_saved = False
-    merchant = tx.merchant.strip()
-    if merchant:
-        MerchantRule.objects.update_or_create(
-            merchant=merchant,
-            defaults={'category': category},
-        )
-        merchant_rule_saved = True
-        logger.info('MerchantRule saved — merchant=%r category=%s', merchant, category)
-
-    return JsonResponse({'status': 'ok', 'merchant_rule_saved': merchant_rule_saved})
+    logger.info('Transaction categorized — id=%s category=%s', tx_id, category)
+    return JsonResponse({'status': 'ok'})
 
 
 # ── DELETE /api/transactions/<id>/ ───────────────────────────────────────────
@@ -122,6 +104,19 @@ def delete_transaction(request, tx_id):
     tx.delete()
     logger.info('Transaction deleted — id=%s', tx_id)
     return JsonResponse({'status': 'deleted'})
+
+
+# ── POST /api/transactions/<id>/skip/ ────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['POST'])
+def skip_transaction(request, tx_id):
+    tx = get_object_or_404(Transaction, pk=tx_id)
+    tx.is_skipped = True
+    tx.save(update_fields=['is_skipped'])
+    logger.info('Transaction skipped — id=%s', tx_id)
+    return JsonResponse({'status': 'skipped'})
+
 
 @csrf_exempt
 @require_http_methods(['POST'])
@@ -219,7 +214,7 @@ def dashboard_api(request):
     cycle = BudgetCycle.objects.filter(status='active').first()
 
     if cycle:
-        qs    = Transaction.objects.filter(created_at__gte=cycle.started_at)
+        qs    = Transaction.objects.filter(created_at__gte=cycle.started_at, is_skipped=False)
         month = cycle.month
         year  = cycle.year
     else:
@@ -260,14 +255,15 @@ def dashboard_api(request):
             'created_at': t.created_at.strftime('%Y-%m-%d %H:%M'),
         })
 
-    # Pending — global, all uncategorized debits
+    # Pending — global, all uncategorized non-skipped transactions
     pending = []
-    for t in Transaction.objects.filter(is_categorized=False, type='debit').order_by('-date', '-created_at'):
+    for t in Transaction.objects.filter(is_categorized=False, is_skipped=False).order_by('-date', '-created_at'):
         pending.append({
-            'id':       t.pk,
-            'merchant': t.merchant or '—',
-            'amount':   float(t.amount),
-            'date':     t.date.strftime('%Y-%m-%d') if t.date else None,
+            'id':      t.pk,
+            'amount':  float(t.amount),
+            'type':    t.type,
+            'raw_sms': t.raw_sms,
+            'date':    t.date.strftime('%Y-%m-%d') if t.date else None,
         })
 
     # Active cycle — cycle-scoped summary cards

@@ -22,6 +22,7 @@ class Transaction(models.Model):
     merchant       = models.CharField(max_length=200, blank=True)
     category       = models.CharField(max_length=50, choices=CATEGORIES, default='other')
     is_categorized = models.BooleanField(default=False)
+    is_skipped     = models.BooleanField(default=False)
     balance        = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     date           = models.DateField(null=True, blank=True)
     raw_sms        = models.TextField()
@@ -33,17 +34,6 @@ class Transaction(models.Model):
     def __str__(self):
         return f"{self.get_type_display()} {self.amount} ر.س — {self.merchant or self.get_category_display()}"
 
-
-class MerchantRule(models.Model):
-    merchant   = models.CharField(max_length=200, unique=True)
-    category   = models.CharField(max_length=50, choices=Transaction.CATEGORIES)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['merchant']
-
-    def __str__(self):
-        return f"{self.merchant} → {dict(Transaction.CATEGORIES).get(self.category, self.category)}"
 
 
 class CategoryBudget(models.Model):
