@@ -8,7 +8,7 @@ from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.db.models import Sum, Count, F
+from django.db.models import Sum, F
 
 from .models import Transaction, MerchantRule, CategoryBudget, BudgetCycle
 from .services.parser import parse_sms
@@ -99,7 +99,7 @@ def categorize_transaction(request, tx_id):
         return JsonResponse({'error': 'invalid json'}, status=400)
 
     category = body.get('category', '').strip()
-    if category not in [c[0] for c in Transaction.CATEGORIES]:
+    if not category:
         return JsonResponse({'error': 'invalid category'}, status=400)
 
     tx.category       = category
@@ -219,88 +219,22 @@ def cycle_update(request):
         return JsonResponse({'error': 'invalid json'}, status=400)
 
     try:
-        new_starting = Decimal(str(body['starting_balance']))
+        new_remaining = Decimal(str(body['remaining_balance']))
     except Exception:
-        return JsonResponse({'error': 'invalid starting_balance'}, status=400)
+        return JsonResponse({'error': 'invalid remaining_balance'}, status=400)
 
-    if new_starting <= 0:
+    if new_remaining < 0:
         return JsonResponse({'error': 'invalid value'}, status=400)
 
-    # Recompute remaining from actual transaction history
-    total_spent = (
-        Transaction.objects
-        .filter(type='debit', is_categorized=True, created_at__gte=cycle.started_at)
-        .aggregate(s=Sum('amount'))['s']
-    ) or Decimal('0')
+    cycle.remaining_balance = new_remaining
+    cycle.save(update_fields=['remaining_balance'])
 
-    cycle.starting_balance  = new_starting
-    cycle.remaining_balance = new_starting - total_spent
-    cycle.save(update_fields=['starting_balance', 'remaining_balance'])
-
-    logger.info('Cycle updated — id=%s new_starting=%s remaining=%s',
-                cycle.pk, new_starting, cycle.remaining_balance)
+    logger.info('Cycle updated — id=%s remaining=%s', cycle.pk, new_remaining)
     return JsonResponse({
         'status':            'updated',
-        'remaining_balance': float(cycle.remaining_balance),
+        'remaining_balance': float(new_remaining),
     })
 
-
-# ── POST /api/cycle/reconcile/ ────────────────────────────────────────────────
-
-@csrf_exempt
-@require_http_methods(['POST'])
-def reconcile(request):
-    cycle = BudgetCycle.objects.filter(status='active').first()
-    if not cycle:
-        return JsonResponse({'error': 'no active cycle'}, status=400)
-
-    try:
-        body = json.loads(request.body)
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        return JsonResponse({'error': 'invalid json'}, status=400)
-
-    try:
-        bank_balance = Decimal(str(body['bank_balance']))
-    except Exception:
-        return JsonResponse({'error': 'invalid bank_balance'}, status=400)
-
-    if bank_balance < 0:
-        return JsonResponse({'error': 'invalid value'}, status=400)
-
-    difference = cycle.remaining_balance - bank_balance
-
-    if difference == 0:
-        return JsonResponse({'status': 'matched'})
-
-    tx_type = 'debit' if difference > 0 else 'credit'
-    amount  = abs(difference)
-
-    Transaction.objects.create(
-        amount=amount,
-        type=tx_type,
-        merchant='تسوية يدوية',
-        category='other',
-        is_categorized=True,
-        balance=bank_balance,
-        date=timezone.now().date(),
-        raw_sms='',
-    )
-
-    if tx_type == 'debit':
-        BudgetCycle.objects.filter(status='active').update(
-            remaining_balance=F('remaining_balance') - amount
-        )
-    else:
-        BudgetCycle.objects.filter(status='active').update(
-            remaining_balance=F('remaining_balance') + amount
-        )
-
-    logger.info('Reconciliation — direction=%s amount=%s bank_balance=%s', tx_type, amount, bank_balance)
-    return JsonResponse({
-        'status':    'ok',
-        'difference': float(amount),
-        'direction':  tx_type,
-    })
 
 
 # ── GET /api/dashboard/ ───────────────────────────────────────────────────────
@@ -325,7 +259,7 @@ def dashboard_api(request):
     by_category = list(
         debits.filter(is_categorized=True)
         .values('category')
-        .annotate(total=Sum('amount'), count=Count('id'))
+        .annotate(total=Sum('amount'))
         .order_by('-total')
     )
     for row in by_category:

@@ -312,8 +312,6 @@
     <div>
       <h1>مراقب الميزانية</h1>
       <div class="header-meta">
-        <span id="header-month"></span>
-        &nbsp;|&nbsp;
         آخر تحديث: <span id="last-update">—</span>
       </div>
     </div>
@@ -339,7 +337,7 @@
         <div class="setup-fields">
           <div class="setup-field">
             <label>الرصيد الابتدائي (ر.س)</label>
-            <input type="number" id="setup-balance" min="1" step="0.01" placeholder="9000" />
+            <input type="number" id="setup-balance" min="1" step="0.01" />
           </div>
           <div class="setup-field">
             <label>الشهر</label>
@@ -378,20 +376,12 @@
       </div>
       <div class="cycle-controls">
         <button class="btn btn-ghost" onclick="toggleEditBalance()">تعديل الرصيد</button>
-        <button class="btn btn-ghost" onclick="toggleReconcile()">مطابقة مع البنك</button>
         <button class="btn btn-danger" onclick="closeCycle()">أوقف الحساب</button>
       </div>
       <div class="edit-balance-panel" id="edit-balance-panel">
-        <input type="number" id="new-balance" min="1" step="0.01" placeholder="الرصيد الجديد" />
+        <input type="number" id="new-balance" min="0" step="0.01" placeholder="الرصيد الجديد" />
         <button class="btn btn-primary" onclick="updateBalance()">حفظ</button>
         <button class="btn btn-ghost" onclick="toggleEditBalance()">إلغاء</button>
-      </div>
-      <div class="edit-balance-panel" id="reconcile-panel">
-        <input type="number" id="bank-balance-input" min="0" step="0.01"
-               placeholder="رصيد البنك الفعلي" oninput="updateReconcileDiff()" />
-        <span id="reconcile-diff" style="font-size:.9rem;white-space:nowrap"></span>
-        <button id="reconcile-confirm" class="btn btn-primary" onclick="confirmReconcile()" disabled>تأكيد المطابقة</button>
-        <button class="btn btn-ghost" onclick="toggleReconcile()">إلغاء</button>
       </div>
     </div>
 
@@ -517,72 +507,8 @@
       const panel = document.getElementById('edit-balance-panel');
       const open  = panel.style.display === 'flex';
       panel.style.display = open ? 'none' : 'flex';
-      if (!open) {
-        document.getElementById('reconcile-panel').style.display = 'none';
-        if (currentCycle) document.getElementById('new-balance').value = currentCycle.starting_balance;
-      }
-    }
-
-    function toggleReconcile() {
-      const panel = document.getElementById('reconcile-panel');
-      const open  = panel.style.display === 'flex';
-      panel.style.display = open ? 'none' : 'flex';
-      if (!open) {
-        document.getElementById('edit-balance-panel').style.display = 'none';
-        document.getElementById('bank-balance-input').value = '';
-        document.getElementById('reconcile-diff').textContent = '';
-        document.getElementById('reconcile-diff').style.color = '';
-        document.getElementById('reconcile-confirm').disabled = true;
-      }
-    }
-
-    function updateReconcileDiff() {
-      const input      = parseFloat(document.getElementById('bank-balance-input').value);
-      const diffEl     = document.getElementById('reconcile-diff');
-      const confirmBtn = document.getElementById('reconcile-confirm');
-
-      if (!currentCycle || isNaN(input) || input < 0) {
-        diffEl.textContent = '';
-        confirmBtn.disabled = true;
-        return;
-      }
-
-      const diff    = currentCycle.remaining_balance - input;
-      const absDiff = Math.abs(diff);
-
-      if (absDiff < 0.005) {
-        diffEl.textContent  = 'الرصيد متطابق ✅';
-        diffEl.style.color  = 'var(--green)';
-        confirmBtn.disabled = true;
-      } else if (diff > 0) {
-        diffEl.textContent  = `الفرق: ${fmt(absDiff)} خصم`;
-        diffEl.style.color  = 'var(--red)';
-        confirmBtn.disabled = false;
-      } else {
-        diffEl.textContent  = `الفرق: ${fmt(absDiff)} إيداع`;
-        diffEl.style.color  = 'var(--green)';
-        confirmBtn.disabled = false;
-      }
-    }
-
-    async function confirmReconcile() {
-      const input = parseFloat(document.getElementById('bank-balance-input').value);
-      if (isNaN(input) || input < 0) return;
-      const btn = document.getElementById('reconcile-confirm');
-      btn.disabled = true;
-      try {
-        const r = await fetch('/api/cycle/reconcile/', {
-          method:  'POST',
-          headers: {'Content-Type': 'application/json'},
-          body:    JSON.stringify({bank_balance: input}),
-        });
-        const d = await r.json();
-        if (!r.ok) { alert(d.error || 'خطأ'); btn.disabled = false; return; }
-        toggleReconcile();
-        loadData();
-      } catch {
-        alert('خطأ في الاتصال');
-        btn.disabled = false;
+      if (!open && currentCycle) {
+        document.getElementById('new-balance').value = currentCycle.remaining_balance;
       }
     }
 
@@ -593,13 +519,37 @@
         const r = await fetch('/api/cycle/update/', {
           method: 'PATCH',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({starting_balance: val}),
+          body: JSON.stringify({remaining_balance: val}),
         });
         const d = await r.json();
         if (!r.ok) { alert(d.error || 'خطأ'); return; }
         toggleEditBalance();
         loadData();
       } catch { alert('خطأ في الاتصال'); }
+    }
+
+    // ── Custom category input ──────────────────────────────────
+    function showCustomCategoryInput(txId, cardEl) {
+      const existing = cardEl.querySelector('.custom-cat-form');
+      if (existing) { existing.remove(); return; }
+      const form = document.createElement('div');
+      form.className = 'custom-cat-form';
+      form.style.cssText = 'display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap;align-items:center;';
+      form.innerHTML = `
+        <input type="text" class="custom-cat-input"
+               placeholder="اسم الفئة..."
+               style="flex:1;min-width:120px;background:var(--bg);border:1px solid var(--border);border-radius:.4rem;color:var(--text);font-family:'Tajawal',sans-serif;font-size:.85rem;padding:.3rem .6rem;outline:none;" />
+        <button class="cat-btn" style="background:var(--accent);color:#0f172a;border-color:var(--accent);"
+                onclick="confirmCustomCategory(${txId}, this.closest('.pending-card'))">تأكيد</button>`;
+      cardEl.appendChild(form);
+      form.querySelector('input').focus();
+    }
+
+    function confirmCustomCategory(txId, cardEl) {
+      const input = cardEl.querySelector('.custom-cat-input');
+      const value = input ? input.value.trim() : '';
+      if (!value) { if (input) input.focus(); return; }
+      categorize(txId, value, cardEl);
     }
 
     // ── Pending ────────────────────────────────────────────────
@@ -641,7 +591,9 @@
         if (existing.has(String(tx.id))) return;
         const btns = CATEGORIES.map(c =>
           `<button class="cat-btn" onclick="categorize(${tx.id},'${c.key}',this.closest('.pending-card'))">${c.label}</button>`
-        ).join('');
+        ).join('') +
+          `<button class="cat-btn" style="border-color:#475569;color:var(--muted);"
+                   onclick="showCustomCategoryInput(${tx.id},this.closest('.pending-card'))">إدخال يدوي</button>`;
         const card = document.createElement('div');
         card.className  = 'pending-card';
         card.dataset.id = tx.id;
@@ -672,7 +624,6 @@
         setup.style.display  = 'block';
         active.style.display = 'none';
         document.getElementById('edit-balance-panel').style.display = 'none';
-        document.getElementById('reconcile-panel').style.display    = 'none';
       }
     }
 
@@ -704,7 +655,6 @@
     // ── Main render ────────────────────────────────────────────
     function render(data) {
       const ml = monthLabel(data.month, data.year);
-      document.getElementById('header-month').textContent       = ml;
       document.getElementById('header-month-chart').textContent = ml;
       document.getElementById('header-month-table').textContent = ml;
       document.getElementById('last-update').textContent = new Date().toLocaleTimeString('ar-SA');
