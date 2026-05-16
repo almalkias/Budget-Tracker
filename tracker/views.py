@@ -307,14 +307,18 @@ def reconcile(request):
 
 @require_http_methods(['GET'])
 def dashboard_api(request):
-    now = timezone.now()
-    try:
-        month = int(request.GET.get('month', now.month))
-        year  = int(request.GET.get('year', now.year))
-    except ValueError:
-        return JsonResponse({'error': 'invalid month or year'}, status=400)
+    cycle = BudgetCycle.objects.filter(status='active').first()
 
-    qs     = Transaction.objects.filter(date__month=month, date__year=year)
+    if cycle:
+        qs    = Transaction.objects.filter(created_at__gte=cycle.started_at)
+        month = cycle.month
+        year  = cycle.year
+    else:
+        qs    = Transaction.objects.none()
+        _now  = timezone.now()
+        month = _now.month
+        year  = _now.year
+
     debits = qs.filter(type='debit')
 
     # Category totals — month-filtered, categorized debits only (for bar chart)
@@ -359,9 +363,7 @@ def dashboard_api(request):
 
     # Active cycle — cycle-scoped summary cards
     active_cycle = None
-    cycle = BudgetCycle.objects.filter(status='active').first()
     if cycle:
-        tx_count     = Transaction.objects.filter(created_at__gte=cycle.started_at).count()
         active_cycle = {
             'id':                cycle.pk,
             'month':             cycle.month,
@@ -369,7 +371,7 @@ def dashboard_api(request):
             'starting_balance':  float(cycle.starting_balance),
             'remaining_balance': float(cycle.remaining_balance),
             'total_spent':       float(cycle.starting_balance - cycle.remaining_balance),
-            'tx_count':          tx_count,
+            'tx_count':          qs.count(),
             'started_at':        cycle.started_at.strftime('%Y-%m-%d %H:%M'),
         }
 
