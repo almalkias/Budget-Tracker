@@ -35,7 +35,9 @@ def parse_sms(sms_text: str) -> dict | None:
     """
     يحلّل رسائل SMS من البنك الأهلي السعودي ويرجع dict أو None إذا لم يُعرف النمط.
     """
-    sms = sms_text.strip()
+    # Strip Unicode bidirectional control characters then collapse extra spaces
+    sms = re.sub(r'[‎‏‪‫‬‭‮]', '', sms_text)
+    sms = re.sub(r' +', ' ', sms).strip()
 
     # ── نمط الإيداع ──────────────────────────────────────────────────────────
     # تم إيداع 22,648.96 ر.س في حسابك رقم ****4986 بتاريخ 28/04/2026 الرصيد 22,690.59 ر.س
