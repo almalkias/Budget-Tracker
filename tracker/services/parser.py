@@ -6,6 +6,31 @@ def _clean_amount(raw: str) -> float:
     return float(raw.replace(',', '').replace(' ', ''))
 
 
+# ── Generic amount extraction (fallback) ─────────────────────────────────────
+
+_EXCLUDE_LINE = re.compile(r'الصرف المتبقي|الرصيد المتبقي|رسوم')
+
+_AMOUNT_PATTERNS = [
+    re.compile(r'مبلغ:?\s*([\d,]+\.?\d*)\s*SAR'),   # مبلغ: X SAR / مبلغ X SAR
+    re.compile(r'مبلغ\s*SAR\s*([\d,]+\.?\d*)'),      # مبلغ SAR X
+    re.compile(r'بـ\s*([\d,]+\.?\d*)\s*SAR'),         # بـ X SAR
+    re.compile(r'مبلغ\s+([\d,]+\.?\d*)'),             # مبلغ X (بدون SAR)
+    re.compile(r'([\d,]+\.?\d*)\s*SAR'),              # fallback: X SAR
+]
+
+_CREDIT_KEYWORDS = re.compile(r'إيداع|ايداع|واردة')
+
+
+def _extract_amount(sms: str):
+    lines = [l for l in sms.splitlines() if not _EXCLUDE_LINE.search(l)]
+    text = '\n'.join(lines)
+    for pat in _AMOUNT_PATTERNS:
+        m = pat.search(text)
+        if m:
+            return _clean_amount(m.group(1))
+    return None
+
+
 def parse_sms(sms_text: str) -> dict | None:
     """
     يحلّل رسائل SMS من البنك الأهلي السعودي ويرجع dict أو None إذا لم يُعرف النمط.
@@ -182,6 +207,19 @@ def parse_sms(sms_text: str) -> dict | None:
             'balance': None,
             'date': parse_date(m.group(3)),
             'raw_sms': sms,
+        }
+
+    # ── Fallback: generic amount extraction ───────────────────────────────────
+    amount = _extract_amount(sms)
+    if amount is not None:
+        tx_type = 'credit' if _CREDIT_KEYWORDS.search(sms) else 'debit'
+        return {
+            'amount':   amount,
+            'type':     tx_type,
+            'merchant': '',
+            'balance':  None,
+            'date':     None,
+            'raw_sms':  sms,
         }
 
     return None
