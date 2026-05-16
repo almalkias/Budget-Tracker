@@ -241,9 +241,9 @@ def dashboard_api(request):
         if b.monthly_limit
     }
 
-    # Recent transactions — month-filtered (for table)
+    # Recent transactions — all categorized, no date filter
     recent = []
-    for t in qs.filter(is_categorized=True).order_by('-created_at')[:20]:
+    for t in Transaction.objects.filter(is_categorized=True, is_skipped=False).order_by('-created_at')[:20]:
         recent.append({
             'id':         t.pk,
             'amount':     float(t.amount),
