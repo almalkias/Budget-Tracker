@@ -461,7 +461,6 @@
             <th>الفئة</th>
             <th>النوع</th>
             <th>المبلغ</th>
-            <th>الرصيد</th>
             <th></th>
           </tr>
         </thead>
@@ -846,7 +845,6 @@
               <td><span class="badge cat-${t.category}">${catLabel}</span></td>
               <td class="${t.type === 'debit' ? 'type-debit' : 'type-credit'}">${typeLabel}</td>
               <td style="font-weight:700;color:${t.type==='debit'?'var(--red)':'var(--green)'}">${sign} ${fmt(t.amount)}</td>
-              <td style="color:var(--muted)">${t.balance != null ? fmt(t.balance) : '—'}</td>
               <td><button class="btn-delete" onclick="deleteTransaction(${t.id}, this.closest('tr'))">✕</button></td>`;
           tbody.appendChild(tr);
         });
