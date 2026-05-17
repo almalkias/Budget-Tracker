@@ -76,6 +76,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SMS_WEBHOOK_SECRET = config('SMS_WEBHOOK_SECRET')
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 
+BASE_DIR.joinpath('logs').mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
