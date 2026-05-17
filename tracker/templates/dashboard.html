@@ -291,17 +291,20 @@
     .type-debit  { color: var(--red); }
     .type-credit { color: var(--green); }
 
-    .cat-supermarket { background:#D1FAE5; color:#065F46; }
-    .cat-clothes     { background:#EDE9FE; color:#4C1D95; }
-    .cat-car         { background:#FEF3C7; color:#78350F; }
-    .cat-food        { background:#FFE4E6; color:#9F1239; }
-    .cat-pharmacy    { background:#DCFCE7; color:#14532D; }
-    .cat-bnpl        { background:#FCE7F3; color:#831843; }
-    .cat-cash        { background:#F5F5F4; color:#44403C; }
-    .cat-family      { background:#E0E7FF; color:#1E1B4B; }
-    .cat-reserve     { background:#E0F2FE; color:#0C4A6E; }
-    .cat-visa        { background:#D1FAE5; color:#064E3B; }
-    .cat-other       { background:#F1F5F9; color:#475569; }
+    .cat-supermarket  { background:#D1FAE5; color:#065F46; }
+    .cat-clothes      { background:#EDE9FE; color:#4C1D95; }
+    .cat-car          { background:#FEF3C7; color:#78350F; }
+    .cat-food         { background:#FFE4E6; color:#9F1239; }
+    .cat-pharmacy     { background:#DCFCE7; color:#14532D; }
+    .cat-bnpl         { background:#FCE7F3; color:#831843; }
+    .cat-cash         { background:#F5F5F4; color:#44403C; }
+    .cat-family       { background:#E0E7FF; color:#1E1B4B; }
+    .cat-reserve      { background:#E0F2FE; color:#0C4A6E; }
+    .cat-visa         { background:#D1FAE5; color:#064E3B; }
+    .cat-maids        { background:#FFF7ED; color:#9A3412; }
+    .cat-school       { background:#EFF6FF; color:#1E40AF; }
+    .cat-laundry      { background:#F0FDF4; color:#166534; }
+    .cat-maintenance  { background:#FDF4FF; color:#6B21A8; }
 
     /* ── Cycle history ────────────────────────────────────────── */
     #cycle-history-section { margin-top: .5rem; }
@@ -488,17 +491,20 @@
   <script>
     // ── Constants ──────────────────────────────────────────────
     const CATEGORIES = [
-      { key: 'supermarket', label: 'سوبر ماركت' },
-      { key: 'clothes',     label: 'ملابس وخياط' },
-      { key: 'car',         label: 'السيارة' },
-      { key: 'food',        label: 'مطاعم وتوصيل' },
-      { key: 'pharmacy',    label: 'صيدلية' },
-      { key: 'bnpl',        label: 'تابي وتمارا' },
-      { key: 'cash',        label: 'سحب كاش' },
-      { key: 'family',      label: 'تحويل للعائلة' },
-      { key: 'reserve',     label: 'سحب من الرصيد الاحتياطي' },
-      { key: 'visa',        label: 'تسديد الفيزا' },
-      { key: 'other',       label: 'أخرى' },
+      { key: 'supermarket',  label: 'سوبر ماركت' },
+      { key: 'clothes',      label: 'ملابس وخياط' },
+      { key: 'car',          label: 'السيارة' },
+      { key: 'food',         label: 'مطاعم وتوصيل' },
+      { key: 'pharmacy',     label: 'صيدلية' },
+      { key: 'bnpl',         label: 'تابي وتمارا' },
+      { key: 'cash',         label: 'سحب كاش' },
+      { key: 'family',       label: 'تحويل للعائلة' },
+      { key: 'reserve',      label: 'سحب من الرصيد الاحتياطي' },
+      { key: 'visa',         label: 'تسديد الفيزا' },
+      { key: 'maids',        label: 'شغالات' },
+      { key: 'school',       label: 'طلبات مدرسة' },
+      { key: 'laundry',      label: 'مغسلة ملابس' },
+      { key: 'maintenance',  label: 'صيانة البيت' },
     ];
     const CAT_MAP = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]));
 

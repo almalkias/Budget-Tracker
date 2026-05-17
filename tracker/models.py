@@ -13,7 +13,10 @@ class Transaction(models.Model):
         ('family',      'تحويل للعائلة'),
         ('reserve',     'سحب من الرصيد الاحتياطي'),
         ('visa',        'تسديد الفيزا'),
-        ('other',       'أخرى'),
+        ('maids',       'شغالات'),
+        ('school',      'طلبات مدرسة'),
+        ('laundry',     'مغسلة ملابس'),
+        ('maintenance', 'صيانة البيت'),
     ]
     TYPES = [('debit', 'خصم'), ('credit', 'إيداع')]
 
