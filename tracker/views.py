@@ -28,7 +28,7 @@ def sms_webhook(request):
         logger.warning('Unauthorized webhook attempt — wrong secret')
         return JsonResponse({'error': 'unauthorized'}, status=401)
 
-    logger.warning('RAW BODY: %r', request.body[:500])
+    logger.warning('RAW BODY: %s', request.body[:500].decode('utf-8', errors='replace'))
 
     try:
         body = json.loads(request.body)

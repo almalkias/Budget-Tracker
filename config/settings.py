@@ -91,15 +91,22 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'tracker.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 3,
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'tracker': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'WARNING',
             'propagate': False,
         },
