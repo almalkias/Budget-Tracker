@@ -380,6 +380,10 @@
         آخر تحديث: <span id="last-update">—</span>
       </div>
     </div>
+    <form method="post" action="/logout/" style="margin:0">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost" style="font-size:.85rem;padding:.35rem .9rem">خروج</button>
+    </form>
   </header>
 
   <div id="error-msg"></div>
@@ -896,7 +900,7 @@
       errEl.style.display = 'none';
 
       fetch('/api/dashboard/')
-        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then(r => { if (r.status === 401) { window.location.href = '/login/'; return; } if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
         .then(render)
         .catch(err => {
           errEl.textContent = `خطأ في تحميل البيانات: ${err.message}`;

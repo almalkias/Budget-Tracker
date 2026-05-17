@@ -3,6 +3,8 @@ from . import views
 
 urlpatterns = [
     path('', views.dashboard_page, name='dashboard'),
+    path('login/',  views.login_view,  name='login'),
+    path('logout/', views.logout_view, name='logout'),
     path('api/sms/', views.sms_webhook, name='sms_webhook'),
     path('api/dashboard/', views.dashboard_api, name='dashboard_api'),
     
