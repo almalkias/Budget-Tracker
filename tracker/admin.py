@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Transaction, CategoryBudget, BudgetCycle
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory
 
 
 @admin.register(Transaction)
@@ -15,6 +15,13 @@ class TransactionAdmin(admin.ModelAdmin):
 class CategoryBudgetAdmin(admin.ModelAdmin):
     list_display = ('category', 'monthly_limit', 'updated_at')
     ordering     = ('category',)
+
+
+@admin.register(MerchantMemory)
+class MerchantMemoryAdmin(admin.ModelAdmin):
+    list_display  = ('merchant', 'category', 'updated_at')
+    search_fields = ('merchant',)
+    ordering      = ('merchant',)
 
 
 @admin.register(BudgetCycle)

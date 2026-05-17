@@ -54,6 +54,19 @@ class CategoryBudget(models.Model):
         return f"{self.category}: {self.monthly_limit or 'بدون حد'}"
 
 
+class MerchantMemory(models.Model):
+    merchant   = models.CharField(max_length=200, unique=True)
+    category   = models.CharField(max_length=50)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'ذاكرة التاجر'
+        verbose_name_plural = 'ذاكرة التجار'
+
+    def __str__(self):
+        return f"{self.merchant} → {self.category}"
+
+
 class BudgetCycle(models.Model):
     STATUS = [('active', 'Active'), ('closed', 'Closed')]
 

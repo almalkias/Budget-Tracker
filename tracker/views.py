@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Sum
 
-from .models import Transaction, CategoryBudget, BudgetCycle
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory
 from .services.parser import parse_sms
 
 logger = logging.getLogger('tracker')
@@ -135,6 +135,13 @@ def categorize_transaction(request, tx_id):
     tx.is_categorized = True
     tx.cycle          = active_cycle
     tx.save(update_fields=['category', 'is_categorized', 'cycle'])
+
+    if tx.merchant:
+        MerchantMemory.objects.update_or_create(
+            merchant=tx.merchant,
+            defaults={'category': category},
+        )
+
     logger.info('Transaction categorized — id=%s category=%s cycle=%s', tx_id, category, active_cycle and active_cycle.pk)
     return JsonResponse({'status': 'ok'})
 
@@ -312,14 +319,17 @@ def dashboard_api(request):
         })
 
     # Pending — global, all uncategorized non-skipped transactions
+    memory = {m.merchant: m.category for m in MerchantMemory.objects.all()}
     pending = []
     for t in Transaction.objects.filter(is_categorized=False, is_skipped=False).order_by('created_at'):
         pending.append({
-            'id':      t.pk,
-            'amount':  float(t.amount),
-            'type':    t.type,
-            'raw_sms': t.raw_sms,
-            'date':    t.date.strftime('%Y-%m-%d') if t.date else None,
+            'id':                 t.pk,
+            'amount':             float(t.amount),
+            'type':               t.type,
+            'merchant':           t.merchant,
+            'raw_sms':            t.raw_sms,
+            'date':               t.date.strftime('%Y-%m-%d') if t.date else None,
+            'suggested_category': memory.get(t.merchant) if t.merchant else None,
         })
 
     # Active cycle — cycle-scoped summary cards
