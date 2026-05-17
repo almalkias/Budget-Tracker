@@ -722,7 +722,7 @@
           pctEl.textContent = '—';
           pctEl.className   = 'value';
         } else {
-          pctEl.textContent = cycle.spending_percentage.toLocaleString('ar-SA') + '٪ (' + fmt(cycle.total_expenses) + ' ر.س)';
+          pctEl.textContent = cycle.spending_percentage.toLocaleString('ar-SA') + '٪ (' + fmt(cycle.total_expenses) + ')';
           const p = cycle.spending_percentage;
           pctEl.className = 'value ' + (p > 90 ? 'spent' : p >= 70 ? 'pct-yellow' : 'pct-green');
         }
@@ -777,7 +777,7 @@
         if (c.spending_percentage !== null) {
           const p     = c.spending_percentage;
           const color = p > 90 ? 'var(--red)' : p >= 70 ? 'var(--yellow)' : 'var(--green)';
-          pctHtml = `<span style="color:${color};font-weight:700">${p.toLocaleString('ar-SA')}٪ (${fmt(c.total_spent)} ر.س)</span>`;
+          pctHtml = `<span style="color:${color};font-weight:700">${p.toLocaleString('ar-SA')}٪ (${fmt(c.total_spent)})</span>`;
         }
         const breakdownRows = c.by_category.length
           ? c.by_category.map(r =>
