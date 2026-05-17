@@ -128,6 +128,8 @@ def categorize_transaction(request, tx_id):
         return JsonResponse({'error': 'invalid category'}, status=400)
 
     active_cycle = BudgetCycle.objects.filter(status='active').first()
+    if not active_cycle:
+        return JsonResponse({'error': 'no active cycle'}, status=400)
 
     tx.category       = category
     tx.is_categorized = True

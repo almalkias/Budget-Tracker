@@ -652,6 +652,10 @@
 
     // ── Pending ────────────────────────────────────────────────
     function categorize(txId, category, cardEl) {
+      if (!currentCycle) {
+        showNoCycleWarning();
+        return;
+      }
       cardEl.classList.add('hiding');
       fetch(`/api/transactions/${txId}/categorize/`, {
         method: 'POST',
@@ -659,7 +663,12 @@
         body: JSON.stringify({category}),
       })
       .then(r => r.json())
-      .then(() => {
+      .then(data => {
+        if (data.error === 'no active cycle') {
+          cardEl.classList.remove('hiding');
+          showNoCycleWarning();
+          return;
+        }
         setTimeout(() => {
           cardEl.remove();
           const remaining = document.querySelectorAll('.pending-card').length;
@@ -669,6 +678,16 @@
         }, 300);
       })
       .catch(() => { cardEl.classList.remove('hiding'); alert('فشل الحفظ، حاول مجدداً'); });
+    }
+
+    function showNoCycleWarning() {
+      const el = document.getElementById('no-cycle-warning');
+      if (el) { el.style.display = 'block'; return; }
+      const warn = document.createElement('div');
+      warn.id = 'no-cycle-warning';
+      warn.style.cssText = 'background:var(--red-bg);border:1px solid #F1C0BB;color:var(--red);border-radius:.75rem;padding:.65rem 1rem;margin-bottom:.75rem;font-size:.9rem;';
+      warn.textContent = 'يجب فتح دورة ميزانية أولاً';
+      document.getElementById('pending-list').prepend(warn);
     }
 
     function renderPending(pending) {
@@ -694,10 +713,12 @@
           : 'غير معروف';
         const amountColor = isDebit ? 'var(--red)' : 'var(--green)';
 
+        const noCycle   = !currentCycle;
+        const disabledStyle = noCycle ? 'opacity:.4;cursor:not-allowed;pointer-events:none;' : '';
         const btns = CATEGORIES.map(c =>
-          `<button class="cat-btn" onclick="categorize(${tx.id},'${c.key}',this.closest('.pending-card'))">${c.label}</button>`
+          `<button class="cat-btn" style="${disabledStyle}" onclick="categorize(${tx.id},'${c.key}',this.closest('.pending-card'))">${c.label}</button>`
         ).join('') +
-          `<button class="cat-btn" style="border-color:#475569;color:var(--muted);"
+          `<button class="cat-btn" style="border-color:#475569;color:var(--muted);${disabledStyle}"
                    onclick="showCustomCategoryInput(${tx.id},this.closest('.pending-card'))">إدخال يدوي</button>`;
 
         const card = document.createElement('div');
