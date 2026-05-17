@@ -1,10 +1,13 @@
 import json
 import logging
 from decimal import Decimal
+from functools import wraps
 
 from django.conf import settings
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -14,6 +17,42 @@ from .models import Transaction, CategoryBudget, BudgetCycle
 from .services.parser import parse_sms
 
 logger = logging.getLogger('tracker')
+
+
+def api_login_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'authentication required'}, status=401)
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+# ── GET/POST /login/ ──────────────────────────────────────────────────────────
+
+@require_http_methods(['GET', 'POST'])
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard')
+    error = ''
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect(request.GET.get('next', '/'))
+        error = 'اسم المستخدم أو كلمة المرور غير صحيحة'
+        logger.warning('Failed login attempt — username: %s', username)
+    return render(request, 'login.html', {'error': error})
+
+
+# ── POST /logout/ ─────────────────────────────────────────────────────────────
+
+@require_http_methods(['POST'])
+def logout_view(request):
+    logout(request)
+    return redirect('login')
 
 
 # ── POST /api/sms/ ────────────────────────────────────────────────────────────
@@ -75,6 +114,7 @@ def sms_webhook(request):
 
 @csrf_exempt
 @require_http_methods(['POST'])
+@api_login_required
 def categorize_transaction(request, tx_id):
     tx = get_object_or_404(Transaction, pk=tx_id)
 
@@ -101,6 +141,7 @@ def categorize_transaction(request, tx_id):
 
 @csrf_exempt
 @require_http_methods(['DELETE'])
+@api_login_required
 def delete_transaction(request, tx_id):
     tx = get_object_or_404(Transaction, pk=tx_id)
 
@@ -113,6 +154,7 @@ def delete_transaction(request, tx_id):
 
 @csrf_exempt
 @require_http_methods(['POST'])
+@api_login_required
 def skip_transaction(request, tx_id):
     tx = get_object_or_404(Transaction, pk=tx_id)
     tx.is_skipped = True
@@ -123,6 +165,7 @@ def skip_transaction(request, tx_id):
 
 @csrf_exempt
 @require_http_methods(['POST'])
+@api_login_required
 def cycle_start(request):
     if BudgetCycle.objects.filter(status='active').exists():
         return JsonResponse({'error': 'a cycle is already active'}, status=400)
@@ -157,6 +200,7 @@ def cycle_start(request):
 
 @csrf_exempt
 @require_http_methods(['POST'])
+@api_login_required
 def cycle_close(request):
     cycle = BudgetCycle.objects.filter(status='active').first()
     if not cycle:
@@ -181,6 +225,7 @@ def cycle_close(request):
 
 @csrf_exempt
 @require_http_methods(['PATCH'])
+@api_login_required
 def cycle_update(request):
     cycle = BudgetCycle.objects.filter(status='active').first()
     if not cycle:
@@ -213,6 +258,7 @@ def cycle_update(request):
 # ── GET /api/dashboard/ ───────────────────────────────────────────────────────
 
 @require_http_methods(['GET'])
+@api_login_required
 def dashboard_api(request):
     cycle = BudgetCycle.objects.filter(status='active').first()
 
@@ -339,5 +385,6 @@ def dashboard_api(request):
 
 # ── GET / ─────────────────────────────────────────────────────────────────────
 
+@login_required
 def dashboard_page(request):
     return render(request, 'dashboard.html')
