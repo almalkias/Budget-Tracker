@@ -77,6 +77,12 @@ SMS_WEBHOOK_SECRET = config('SMS_WEBHOOK_SECRET')
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
 ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
+# ── Parser selection ──────────────────────────────────────────────────────────
+# Set to True to use the Claude API parser (requires ANTHROPIC_API_KEY).
+# Set to False to use the regex-based parser (default, no API key needed).
+# Can also be overridden via .env: USE_CLAUDE_PARSER=True
+USE_CLAUDE_PARSER = config('USE_CLAUDE_PARSER', default=False, cast=bool)
+
 LOGIN_URL = '/login/'
 
 BASE_DIR.joinpath('logs').mkdir(exist_ok=True)

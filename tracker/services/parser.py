@@ -52,10 +52,10 @@ def _parse_with_claude(sms: str) -> dict | None:
         client = anthropic.Anthropic(api_key=api_key)
 
         prompt = (
-            "Analyze this bank SMS and return ONLY a JSON object with no explanation:\n\n"
-            f"{sms}\n\n"
-            "Return exactly this structure:\n"
-            '{"amount": <float or 0 if not found>, "type": "credit" or "debit", "date": "DD/MM/YY" or null}'
+            "Parse this Saudi bank SMS. Return ONLY JSON, no explanation:\n"
+            '{"amount": <float, 0 if declined/OTP/no transaction>, "type": "credit" or "debit", "date": "DD/MM/YY" or null}\n\n'
+            "credit=money in, debit=money out. Date format DD/MM/YY.\n\n"
+            f"{sms}"
         )
 
         message = client.messages.create(
@@ -190,17 +190,27 @@ def parse_sms(sms_text: str) -> dict | None:
             y += 2000
         return date(y, int(m), int(d))
 
-    # ── Try Claude API first ──────────────────────────────────────────────────
-    claude_result = _parse_with_claude(sms)
-    if claude_result is not None and claude_result['amount'] != 0:
-        return {
-            'amount':   claude_result['amount'],
-            'type':     claude_result['type'],
-            'merchant': '',
-            'balance':  None,
-            'date':     claude_result['date'],
-            'raw_sms':  sms,
-        }
+    # ── Parser selection ──────────────────────────────────────────────────────
+    # To enable Claude API parser: set USE_CLAUDE_PARSER=True in .env
+    # Claude API parser behaviour:
+    #   None  → API failed (exception / bad JSON) → fall through to regex
+    #   dict  → Claude responded; trust it completely
+    #     amount > 0 → valid transaction
+    #     amount = 0 → declined / OTP / not a transaction → return None immediately
+    from django.conf import settings as _settings
+    if getattr(_settings, 'USE_CLAUDE_PARSER', False):
+        claude_result = _parse_with_claude(sms)
+        if claude_result is not None:
+            if claude_result['amount'] == 0:
+                return None
+            return {
+                'amount':   claude_result['amount'],
+                'type':     claude_result['type'],
+                'merchant': '',
+                'balance':  None,
+                'date':     claude_result['date'],
+                'raw_sms':  sms,
+            }
 
     # ── محاولة الإيداع ────────────────────────────────────────────────────────
     m = credit_pattern.search(sms)
