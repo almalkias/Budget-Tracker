@@ -75,6 +75,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SMS_WEBHOOK_SECRET = config('SMS_WEBHOOK_SECRET')
 GEMINI_API_KEY = config('GEMINI_API_KEY', default='')
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 
 LOGIN_URL = '/login/'
 

@@ -1,5 +1,9 @@
+import json
+import logging
 import re
 from datetime import date
+
+logger = logging.getLogger('tracker')
 
 
 def _clean_amount(raw: str) -> float:
@@ -29,6 +33,65 @@ def _extract_amount(sms: str):
         if m:
             return _clean_amount(m.group(1))
     return None
+
+
+def _parse_with_claude(sms: str) -> dict | None:
+    """
+    Try to extract amount, type, and date using Claude API.
+    Returns dict with keys: amount (float), type (str), date (date|None)
+    Returns None if the API call fails or returns unusable data.
+    """
+    try:
+        from django.conf import settings
+        import anthropic
+
+        api_key = settings.ANTHROPIC_API_KEY
+        if not api_key:
+            return None
+
+        client = anthropic.Anthropic(api_key=api_key)
+
+        prompt = (
+            "Analyze this bank SMS and return ONLY a JSON object with no explanation:\n\n"
+            f"{sms}\n\n"
+            "Return exactly this structure:\n"
+            '{"amount": <float or 0 if not found>, "type": "credit" or "debit", "date": "DD/MM/YY" or null}'
+        )
+
+        message = client.messages.create(
+            model='claude-sonnet-4-20250514',
+            max_tokens=128,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+
+        raw = message.content[0].text.strip()
+        # Strip markdown code fences if present
+        if raw.startswith('```'):
+            raw = re.sub(r'^```[^\n]*\n?', '', raw)
+            raw = re.sub(r'\n?```$', '', raw)
+
+        data = json.loads(raw)
+
+        amount = float(data.get('amount') or 0)
+        tx_type = data.get('type', 'debit')
+        if tx_type not in ('credit', 'debit'):
+            tx_type = 'debit'
+
+        raw_date = data.get('date')
+        parsed_date = None
+        if raw_date:
+            d, m, y = raw_date.split('/')
+            y = int(y)
+            if y < 100:
+                y += 2000
+            parsed_date = date(y, int(m), int(d))
+
+        logger.debug('Claude parser succeeded: amount=%s type=%s date=%s', amount, tx_type, parsed_date)
+        return {'amount': amount, 'type': tx_type, 'date': parsed_date}
+
+    except Exception as exc:
+        logger.warning('Claude parser failed, falling back to regex: %s', exc)
+        return None
 
 
 def parse_sms(sms_text: str) -> dict | None:
@@ -127,7 +190,19 @@ def parse_sms(sms_text: str) -> dict | None:
             y += 2000
         return date(y, int(m), int(d))
 
-    # محاولة الإيداع
+    # ── Try Claude API first ──────────────────────────────────────────────────
+    claude_result = _parse_with_claude(sms)
+    if claude_result is not None and claude_result['amount'] != 0:
+        return {
+            'amount':   claude_result['amount'],
+            'type':     claude_result['type'],
+            'merchant': '',
+            'balance':  None,
+            'date':     claude_result['date'],
+            'raw_sms':  sms,
+        }
+
+    # ── محاولة الإيداع ────────────────────────────────────────────────────────
     m = credit_pattern.search(sms)
     if m:
         return {
