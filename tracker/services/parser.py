@@ -302,7 +302,7 @@ def parse_sms(sms_text: str) -> dict | None:
         return {
             'amount':   _clean_amount(m.group(1)),
             'type':     'debit',
-            'merchant': 'تحويل للاحتياطي',
+            'merchant': 'تحويل الى الاحتياطي',
             'balance':  None,
             'date':     parse_date(m.group(2)),
             'raw_sms':  sms,

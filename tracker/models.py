@@ -11,7 +11,7 @@ class Transaction(models.Model):
         ('bnpl',        'تابي وتمارا'),
         ('cash',        'سحب كاش'),
         ('family',      'تحويل للعائلة'),
-        ('reserve_in',  'تحويل للاحتياطي'),
+        ('reserve_in',  'تحويل الى الاحتياطي'),
         ('reserve_out', 'تحويل من الاحتياطي'),
         ('visa',        'تسديد الفيزا'),
         ('maids',       'شغالات'),

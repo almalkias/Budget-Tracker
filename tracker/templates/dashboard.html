@@ -537,7 +537,7 @@
       { key: 'bnpl',         label: 'تابي وتمارا' },
       { key: 'cash',         label: 'سحب كاش' },
       { key: 'family',       label: 'تحويل للعائلة' },
-      { key: 'reserve_in',   label: 'تحويل للاحتياطي' },
+      { key: 'reserve_in',   label: 'تحويل الى الاحتياطي' },
       { key: 'reserve_out',  label: 'تحويل من الاحتياطي' },
       { key: 'visa',         label: 'تسديد الفيزا' },
       { key: 'maids',        label: 'شغالات' },
@@ -873,7 +873,7 @@
           : `<span style="color:var(--muted);font-size:.85rem">لا توجد مصروفات</span>`;
 
         list.innerHTML += `
-          <div class="history-item">
+          <div class="history-item" id="history-item-${c.id}">
             <div class="history-row" id="history-row-${c.id}" onclick="toggleCycleBreakdown(${c.id})">
               <span class="history-month">${monthLabel(c.month, c.year)}</span>
               <div class="history-stats">
@@ -881,13 +881,27 @@
                 <span class="neg">مصروف: ${spent}</span>
                 ${pctHtml}
               </div>
-              <span class="expand-icon" id="expand-icon-${c.id}">▾</span>
+              <div style="display:flex;align-items:center;gap:.5rem">
+                <span class="expand-icon" id="expand-icon-${c.id}">▾</span>
+                <button class="btn btn-ghost" style="padding:.2rem .6rem;font-size:.8rem;color:var(--red)" onclick="event.stopPropagation();deleteCycle(${c.id})">حذف</button>
+              </div>
             </div>
             <div class="cycle-breakdown" id="breakdown-${c.id}" style="display:none">
               ${breakdownRows}
             </div>
           </div>`;
       });
+    }
+
+    async function deleteCycle(id) {
+      if (!confirm('هل أنت متأكد من حذف هذه الدورة؟')) return;
+      const r = await fetch(`/api/cycle/${id}/`, { method: 'DELETE' });
+      if (r.ok) {
+        document.getElementById(`history-item-${id}`).remove();
+        const list = document.getElementById('cycle-history-list');
+        if (!list.children.length)
+          document.getElementById('cycle-history-section').style.display = 'none';
+      }
     }
 
     // ── Main render ────────────────────────────────────────────

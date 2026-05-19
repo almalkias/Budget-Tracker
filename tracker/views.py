@@ -296,6 +296,17 @@ def cycle_update(request):
     })
 
 
+# ── DELETE /api/cycle/<id>/ ───────────────────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['DELETE'])
+@api_login_required
+def cycle_delete(request, cycle_id):
+    cycle = get_object_or_404(BudgetCycle, pk=cycle_id, status='closed')
+    cycle.delete()
+    logger.info('Cycle deleted — id=%s', cycle_id)
+    return JsonResponse({'status': 'deleted'})
+
 
 # ── GET /api/dashboard/ ───────────────────────────────────────────────────────
 
