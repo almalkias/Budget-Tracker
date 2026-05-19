@@ -809,7 +809,7 @@
           pctEl.textContent = '—';
           pctEl.className   = 'value';
         } else {
-          pctEl.textContent = cycle.spending_percentage.toLocaleString('ar-SA') + '٪ (' + fmt(cycle.total_expenses) + ')';
+          pctEl.textContent = cycle.spending_percentage.toLocaleString('ar-SA') + '٪';
           const p = cycle.spending_percentage;
           pctEl.className = 'value ' + (p > 90 ? 'spent' : p >= 70 ? 'pct-yellow' : 'pct-green');
         }
