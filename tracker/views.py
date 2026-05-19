@@ -83,17 +83,20 @@ def sms_webhook(request):
 
     parsed = parse_sms(sms_text)
     if parsed is not None:
+        auto_category = parsed.get('category')
+        active_cycle  = BudgetCycle.objects.filter(status='active').first() if auto_category else None
         Transaction.objects.create(
             amount=parsed['amount'],
             type=parsed['type'],
             merchant=parsed['merchant'],
-            category='other',
-            is_categorized=False,
+            category=auto_category or 'other',
+            is_categorized=bool(auto_category),
+            cycle=active_cycle,
             balance=parsed['balance'],
             date=parsed['date'],
             raw_sms=parsed['raw_sms'],
         )
-        logger.info('Transaction saved — type=%s amount=%s', parsed['type'], parsed['amount'])
+        logger.info('Transaction saved — type=%s amount=%s category=%s', parsed['type'], parsed['amount'], auto_category or 'other')
     else:
         Transaction.objects.create(
             amount=Decimal('0'),
@@ -284,8 +287,10 @@ def dashboard_api(request):
     debits = qs.filter(type='debit')
 
     # Category totals — month-filtered, categorized debits only (for bar chart)
+    # Reserve transfers are excluded as they are not spending
     by_category = list(
         debits.filter(is_categorized=True)
+        .exclude(category__in=['reserve_in', 'reserve_out', 'reserve'])
         .values('category')
         .annotate(total=Sum('amount'))
         .order_by('-total')
@@ -338,8 +343,21 @@ def dashboard_api(request):
         total_expenses = (
             Transaction.objects
             .filter(type='debit', is_categorized=True, cycle=cycle)
+            .exclude(category__in=['reserve_in', 'reserve_out', 'reserve'])
             .aggregate(s=Sum('amount'))['s']
         ) or Decimal('0')
+
+        reserve_in_total = (
+            Transaction.objects
+            .filter(category='reserve_in', cycle=cycle)
+            .aggregate(s=Sum('amount'))['s']
+        ) or Decimal('0')
+        reserve_out_total = (
+            Transaction.objects
+            .filter(category__in=['reserve_out', 'reserve'], cycle=cycle)
+            .aggregate(s=Sum('amount'))['s']
+        ) or Decimal('0')
+        reserve_balance = float(reserve_in_total - reserve_out_total)
         spending_percentage = (
             round(float(total_expenses / cycle.salary) * 100, 1)
             if cycle.salary > 0 else None
@@ -353,6 +371,7 @@ def dashboard_api(request):
             'spending_percentage': spending_percentage,
             'tx_count':            qs.count(),
             'started_at':          cycle.started_at.strftime('%Y-%m-%d %H:%M'),
+            'reserve_balance':     reserve_balance,
         }
 
     # Closed cycle history

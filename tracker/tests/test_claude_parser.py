@@ -169,15 +169,21 @@ class ClaudeParserUnitTests(TestCase):
 
     # ── edge cases ────────────────────────────────────────────────────────────
 
-    def test_declined_transaction_skipped_by_parse_sms(self):
+    def test_declined_transaction_falls_through_to_regex(self):
+        # When Claude returns amount=0, regex runs as safety net.
+        # The amount is extracted so the user can review/skip it in the pending queue.
+        # This prevents silently losing a real transaction Claude misclassified.
         sms = "رصيد غير كافي\nلـشراء نقاط البيع\nبـ416.06 SAR\nمن 0102*\nفي 09/23 17:46"
         result = _call_parse_sms(sms, {"amount": 0, "type": "debit", "date": None})
-        self.assertIsNone(result, "Declined transaction should not be saved")
+        self.assertIsNotNone(result)
+        self.assertEqual(result['amount'], 416.06)
 
-    def test_otp_message_skipped_by_parse_sms(self):
+    def test_otp_message_falls_through_to_regex(self):
+        # Same safety-net behaviour for OTP messages that mention an amount.
         sms = "لا تشارك رمز التفعيل 3965\nتحويل بين حساباتي\nمبلغ SAR 500"
         result = _call_parse_sms(sms, {"amount": 0, "type": "debit", "date": None})
-        self.assertIsNone(result, "OTP message should not be saved")
+        self.assertIsNotNone(result)
+        self.assertEqual(result['amount'], 500.0)
 
     def test_internal_transfer_debit(self):
         sms = "حوالة بين حساباتك\nمن 0102*  مبلغ 1 SAR  إلى 1110*  في 15/05/26 14:58"

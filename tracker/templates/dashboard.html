@@ -326,6 +326,11 @@
     .cat-cash         { background:#F5F5F4; color:#44403C; }
     .cat-family       { background:#E0E7FF; color:#1E1B4B; }
     .cat-reserve      { background:#E0F2FE; color:#0C4A6E; }
+    .cat-reserve_in   { background:#D1FAE5; color:#065F46; }
+    .cat-reserve_out  { background:#FEE2E2; color:#991B1B; }
+    .reserve-pos      { color: var(--green); }
+    .reserve-zero     { color: var(--muted); }
+    .reserve-neg      { color: var(--red); }
     .cat-visa         { background:#D1FAE5; color:#064E3B; }
     .cat-maids        { background:#FFF7ED; color:#9A3412; }
     .cat-school       { background:#EFF6FF; color:#1E40AF; }
@@ -472,6 +477,10 @@
           <div class="label">عدد العمليات</div>
           <div class="value count" id="tx-count">—</div>
         </div>
+        <div class="card">
+          <div class="label">رصيد الاحتياطي</div>
+          <div class="value reserve-zero" id="reserve-balance">—</div>
+        </div>
       </div>
       <div class="cycle-controls">
         <button class="btn btn-ghost" onclick="toggleEditBalance()">تعديل الراتب</button>
@@ -530,6 +539,8 @@
       { key: 'cash',         label: 'سحب كاش' },
       { key: 'family',       label: 'تحويل للعائلة' },
       { key: 'reserve',      label: 'سحب من الرصيد الاحتياطي' },
+      { key: 'reserve_in',   label: 'تحويل للاحتياطي' },
+      { key: 'reserve_out',  label: 'تحويل من الاحتياطي' },
       { key: 'visa',         label: 'تسديد الفيزا' },
       { key: 'maids',        label: 'شغالات' },
       { key: 'school',       label: 'طلبات مدرسة' },
@@ -789,6 +800,10 @@
         document.getElementById('remaining-balance').textContent = fmt(cycle.salary);
         document.getElementById('cycle-spent').textContent       = fmt(cycle.total_expenses);
         document.getElementById('tx-count').textContent          = cycle.tx_count;
+        const rb    = cycle.reserve_balance ?? 0;
+        const rbEl  = document.getElementById('reserve-balance');
+        rbEl.textContent = (rb > 0 ? '+' : '') + fmt(rb);
+        rbEl.className   = 'value ' + (rb < 0 ? 'reserve-neg' : rb === 0 ? 'reserve-zero' : 'reserve-pos');
         const pctEl = document.getElementById('spending-pct');
         if (cycle.spending_percentage === null) {
           pctEl.textContent = '—';

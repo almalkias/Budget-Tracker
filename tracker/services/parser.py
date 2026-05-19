@@ -7,7 +7,11 @@ logger = logging.getLogger('tracker')
 
 
 def _clean_amount(raw: str) -> float:
-    return float(raw.replace(',', '').replace(' ', ''))
+    try:
+        return float(raw.replace(',', '').replace(' ', ''))
+    except (ValueError, TypeError):
+        logger.warning('_clean_amount failed on %r — defaulting to 0.0', raw)
+        return 0.0
 
 
 # ── Generic amount extraction (fallback) ─────────────────────────────────────
@@ -98,9 +102,11 @@ def parse_sms(sms_text: str) -> dict | None:
     """
     يحلّل رسائل SMS من البنك الأهلي السعودي ويرجع dict أو None إذا لم يُعرف النمط.
     """
-    # Strip Unicode bidirectional control characters then collapse extra spaces
-    sms = re.sub(r'[‎‏‪‫‬‭‮]', '', sms_text)
+    # Strip Unicode bidirectional + zero-width control characters
+    sms = re.sub(r'[‎‏‪‫‬‭‮\u200b\u200c\u200d\u200e\u200f\ufeff]', '', sms_text)
     sms = re.sub(r' +', ' ', sms).strip()
+    # Normalize Eastern Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) to ASCII
+    sms = sms.translate(str.maketrans('٠١٢٣٤٥٦٧٨٩', '0123456789'))
 
     # ── نمط الإيداع ──────────────────────────────────────────────────────────
     # تم إيداع 22,648.96 ر.س في حسابك رقم ****4986 بتاريخ 28/04/2026 الرصيد 22,690.59 ر.س
@@ -172,6 +178,29 @@ def parse_sms(sms_text: str) -> dict | None:
         re.DOTALL,
     )
 
+    # ── نمط تحويل للاحتياطي (من 0102* إلى 1110*) ────────────────────────────
+    # حوالة بين حساباتك
+    # من 0102*  مبلغ 500 SAR  إلى 1110*  في 20/05/26 10:00
+    reserve_in_pattern = re.compile(
+        r'حوالة بين حساباتك'
+        r'.*?من\s+0102\*'
+        r'.*?مبلغ\s+([\d,]+\.?\d*)\s+SAR'
+        r'.*?إلى\s+1110\*'
+        r'.*?في\s+(\d{2}/\d{2}/\d{2,4})',
+        re.DOTALL,
+    )
+
+    # ── نمط تحويل من الاحتياطي (من 1110* إلى 0102*) ─────────────────────────
+    # حوالة بين حساباتك
+    # من 1110*  مبلغ 500 SAR  إلى 0102*  في 20/05/26 10:00
+    reserve_out_pattern = re.compile(
+        r'حوالة بين حساباتك'
+        r'.*?من\s+1110\*'
+        r'.*?مبلغ\s+([\d,]+\.?\d*)\s+SAR'
+        r'.*?في\s+(\d{2}/\d{2}/\d{2,4})',
+        re.DOTALL,
+    )
+
     # ── نمط الحوالة بين الحسابات ─────────────────────────────────────────────
     # حوالة بين حساباتك
     # من 0102*  مبلغ 1 SAR  إلى 1110*  في 15/05/26 14:58
@@ -182,13 +211,16 @@ def parse_sms(sms_text: str) -> dict | None:
         re.DOTALL,
     )
 
-    def parse_date(raw: str) -> date:
-        d, m, y = raw.split('/')
-        # دعم السنة بصيغتين: YY أو YYYY
-        y = int(y)
-        if y < 100:
-            y += 2000
-        return date(y, int(m), int(d))
+    def parse_date(raw: str) -> date | None:
+        try:
+            d, m, y = raw.split('/')
+            y = int(y)
+            if y < 100:
+                y += 2000
+            return date(y, int(m), int(d))
+        except (ValueError, TypeError):
+            logger.warning('Could not parse date %r — date will be None', raw)
+            return None
 
     # ── Parser selection ──────────────────────────────────────────────────────
     # To enable Claude API parser: set USE_CLAUDE_PARSER=True in .env
@@ -201,16 +233,20 @@ def parse_sms(sms_text: str) -> dict | None:
     if getattr(_settings, 'USE_CLAUDE_PARSER', False):
         claude_result = _parse_with_claude(sms)
         if claude_result is not None:
-            if claude_result['amount'] == 0:
-                return None
-            return {
-                'amount':   claude_result['amount'],
-                'type':     claude_result['type'],
-                'merchant': '',
-                'balance':  None,
-                'date':     claude_result['date'],
-                'raw_sms':  sms,
-            }
+            if claude_result['amount'] > 0:
+                return {
+                    'amount':   claude_result['amount'],
+                    'type':     claude_result['type'],
+                    'merchant': '',
+                    'balance':  None,
+                    'date':     claude_result['date'],
+                    'raw_sms':  sms,
+                }
+            # Claude returned amount=0 (declined / OTP / uncertain).
+            # Fall through to regex as a safety net — if regex also finds
+            # nothing, we return None. This prevents silently losing a real
+            # transaction that Claude misclassified as declined.
+            logger.info('Claude returned amount=0 — falling through to regex for verification')
 
     # ── محاولة الإيداع ────────────────────────────────────────────────────────
     m = credit_pattern.search(sms)
@@ -258,6 +294,32 @@ def parse_sms(sms_text: str) -> dict | None:
             'balance':  _clean_amount(m.group(3)) if m.group(3) else None,
             'date':     parse_date(m.group(2)),
             'raw_sms':  sms,
+        }
+
+    # محاولة تحويل للاحتياطي (0102* → 1110*)
+    m = reserve_in_pattern.search(sms)
+    if m:
+        return {
+            'amount':   _clean_amount(m.group(1)),
+            'type':     'debit',
+            'merchant': 'تحويل للاحتياطي',
+            'balance':  None,
+            'date':     parse_date(m.group(2)),
+            'raw_sms':  sms,
+            'category': 'reserve_in',
+        }
+
+    # محاولة تحويل من الاحتياطي (1110* → 0102*)
+    m = reserve_out_pattern.search(sms)
+    if m:
+        return {
+            'amount':   _clean_amount(m.group(1)),
+            'type':     'debit',
+            'merchant': 'تحويل من الاحتياطي',
+            'balance':  None,
+            'date':     parse_date(m.group(2)),
+            'raw_sms':  sms,
+            'category': 'reserve_out',
         }
 
     # محاولة الحوالة بين الحسابات
