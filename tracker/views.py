@@ -103,6 +103,9 @@ def sms_webhook(request):
     parsed = parse_sms(sms_text)
     if parsed is not None:
         auto_category = parsed.get('category')
+        # عمليات الاحتياطي لا تُصنَّف تلقائياً — تنتظر التصنيف اليدوي
+        if auto_category in RESERVE_CATEGORIES_IN | RESERVE_CATEGORIES_OUT:
+            auto_category = None
         active_cycle  = BudgetCycle.objects.filter(status='active').first() if auto_category else None
         Transaction.objects.create(
             amount=parsed['amount'],
@@ -115,9 +118,6 @@ def sms_webhook(request):
             date=parsed['date'],
             raw_sms=parsed['raw_sms'],
         )
-        delta = _category_delta(auto_category or '', Decimal(str(parsed['amount'])))
-        if delta:
-            _adjust_reserve(delta)
         logger.info('Transaction saved — type=%s amount=%s category=%s', parsed['type'], parsed['amount'], auto_category or 'other')
     else:
         Transaction.objects.create(
