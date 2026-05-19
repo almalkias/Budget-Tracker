@@ -59,7 +59,7 @@ def _parse_with_claude(sms: str) -> dict | None:
         )
 
         message = client.messages.create(
-            model='claude-sonnet-4-20250514',
+            model='claude-sonnet-4-6',
             max_tokens=128,
             messages=[{'role': 'user', 'content': prompt}],
         )
