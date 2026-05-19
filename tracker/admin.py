@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance
 
 
 @admin.register(Transaction)
@@ -30,3 +30,8 @@ class BudgetCycleAdmin(admin.ModelAdmin):
     list_filter     = ('status',)
     ordering        = ('-started_at',)
     readonly_fields = ('started_at', 'closed_at', 'total_spent')
+
+
+@admin.register(ReserveBalance)
+class ReserveBalanceAdmin(admin.ModelAdmin):
+    list_display = ('balance', 'updated_at')

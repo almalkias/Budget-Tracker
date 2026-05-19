@@ -13,10 +13,29 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Sum
 
-from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance
 from .services.parser import parse_sms
 
 logger = logging.getLogger('tracker')
+
+RESERVE_CATEGORIES_IN  = {'reserve_in'}
+RESERVE_CATEGORIES_OUT = {'reserve_out'}
+
+
+def _adjust_reserve(delta: Decimal):
+    """يعدّل رصيد الاحتياطي بمقدار delta (موجب = إضافة، سالب = سحب)."""
+    rb = ReserveBalance.get()
+    rb.balance += delta
+    rb.save(update_fields=['balance', 'updated_at'])
+
+
+def _category_delta(category: str, amount: Decimal) -> Decimal:
+    """يرجع التأثير على رصيد الاحتياطي لفئة معينة."""
+    if category in RESERVE_CATEGORIES_IN:
+        return +amount
+    if category in RESERVE_CATEGORIES_OUT:
+        return -amount
+    return Decimal('0')
 
 
 def api_login_required(view_func):
@@ -96,6 +115,9 @@ def sms_webhook(request):
             date=parsed['date'],
             raw_sms=parsed['raw_sms'],
         )
+        delta = _category_delta(auto_category or '', Decimal(str(parsed['amount'])))
+        if delta:
+            _adjust_reserve(delta)
         logger.info('Transaction saved — type=%s amount=%s category=%s', parsed['type'], parsed['amount'], auto_category or 'other')
     else:
         Transaction.objects.create(
@@ -134,6 +156,7 @@ def categorize_transaction(request, tx_id):
     if not active_cycle:
         return JsonResponse({'error': 'no active cycle'}, status=400)
 
+    old_category      = tx.category
     tx.category       = category
     tx.is_categorized = True
     tx.cycle          = active_cycle
@@ -144,6 +167,10 @@ def categorize_transaction(request, tx_id):
             merchant=tx.merchant,
             defaults={'category': category},
         )
+
+    delta = _category_delta(category, tx.amount) - _category_delta(old_category, tx.amount)
+    if delta:
+        _adjust_reserve(delta)
 
     logger.info('Transaction categorized — id=%s category=%s cycle=%s', tx_id, category, active_cycle and active_cycle.pk)
     return JsonResponse({'status': 'ok'})
@@ -157,7 +184,10 @@ def categorize_transaction(request, tx_id):
 def delete_transaction(request, tx_id):
     tx = get_object_or_404(Transaction, pk=tx_id)
 
+    delta = _category_delta(tx.category, tx.amount)
     tx.delete()
+    if delta:
+        _adjust_reserve(-delta)
     logger.info('Transaction deleted — id=%s', tx_id)
     return JsonResponse({'status': 'deleted'})
 
@@ -290,7 +320,7 @@ def dashboard_api(request):
     # Reserve transfers are excluded as they are not spending
     by_category = list(
         debits.filter(is_categorized=True)
-        .exclude(category__in=['reserve_in', 'reserve_out', 'reserve'])
+        .exclude(category__in=['reserve_in', 'reserve_out'])
         .values('category')
         .annotate(total=Sum('amount'))
         .order_by('-total')
@@ -343,21 +373,11 @@ def dashboard_api(request):
         total_expenses = (
             Transaction.objects
             .filter(type='debit', is_categorized=True, cycle=cycle)
-            .exclude(category__in=['reserve_in', 'reserve_out', 'reserve'])
+            .exclude(category__in=['reserve_in', 'reserve_out'])
             .aggregate(s=Sum('amount'))['s']
         ) or Decimal('0')
 
-        reserve_in_total = (
-            Transaction.objects
-            .filter(category='reserve_in', cycle=cycle)
-            .aggregate(s=Sum('amount'))['s']
-        ) or Decimal('0')
-        reserve_out_total = (
-            Transaction.objects
-            .filter(category__in=['reserve_out', 'reserve'], cycle=cycle)
-            .aggregate(s=Sum('amount'))['s']
-        ) or Decimal('0')
-        reserve_balance = float(reserve_in_total - reserve_out_total)
+        reserve_balance = float(ReserveBalance.get().balance)
         spending_percentage = (
             round(float(total_expenses / cycle.salary) * 100, 1)
             if cycle.salary > 0 else None

@@ -11,7 +11,6 @@ class Transaction(models.Model):
         ('bnpl',        'تابي وتمارا'),
         ('cash',        'سحب كاش'),
         ('family',      'تحويل للعائلة'),
-        ('reserve',     'سحب من الرصيد الاحتياطي'),
         ('reserve_in',  'تحويل للاحتياطي'),
         ('reserve_out', 'تحويل من الاحتياطي'),
         ('visa',        'تسديد الفيزا'),
@@ -67,6 +66,23 @@ class MerchantMemory(models.Model):
 
     def __str__(self):
         return f"{self.merchant} → {self.category}"
+
+
+class ReserveBalance(models.Model):
+    balance    = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'رصيد الاحتياطي'
+        verbose_name_plural = 'رصيد الاحتياطي'
+
+    def __str__(self):
+        return f"رصيد الاحتياطي: {self.balance}"
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={'balance': 0})
+        return obj
 
 
 class BudgetCycle(models.Model):
