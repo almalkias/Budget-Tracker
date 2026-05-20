@@ -94,8 +94,13 @@ def sms_webhook(request):
         logger.warning('Invalid JSON body: %r', request.body[:200])
         return JsonResponse({'error': 'invalid json'}, status=400)
 
+    sender   = (body.get('sender') or '').strip()
     sms_text = (body.get('content') or body.get('sms') or '').strip()
-    logger.warning('SMS TEXT: %r', sms_text[:200])
+    logger.warning('SMS SENDER: %r — TEXT: %r', sender, sms_text[:200])
+
+    if sender != 'SNB-AlAhli':
+        logger.info('Ignored SMS from sender: %r', sender)
+        return JsonResponse({'status': 'ignored'})
 
     if not sms_text:
         return JsonResponse({'error': 'no sms'}, status=400)
@@ -204,6 +209,7 @@ def skip_transaction(request, tx_id):
     logger.info('Transaction skipped — id=%s', tx_id)
     return JsonResponse({'status': 'skipped'})
 
+# ── POST /api/cycle/start/ ────────────────────────────────────────────────────
 
 @csrf_exempt
 @require_http_methods(['POST'])
