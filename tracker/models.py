@@ -101,3 +101,23 @@ class BudgetCycle(models.Model):
 
     def __str__(self):
         return f"{self.month}/{self.year} — {self.status}"
+
+
+class AppSettings(models.Model):
+    use_claude_parser = models.BooleanField(
+        default=False,
+        verbose_name='استخدام Claude API للتحليل',
+        help_text='فعّل لاستخدام Claude API بدل الـ Regex Parser',
+    )
+
+    class Meta:
+        verbose_name        = 'إعدادات التطبيق'
+        verbose_name_plural = 'إعدادات التطبيق'
+
+    def __str__(self):
+        return 'Claude Parser: مفعّل' if self.use_claude_parser else 'Claude Parser: معطّل'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1, defaults={'use_claude_parser': False})
+        return obj

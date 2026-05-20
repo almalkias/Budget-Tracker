@@ -57,8 +57,15 @@ def _parse_with_claude(sms: str) -> dict | None:
 
         prompt = (
             "Parse this Saudi bank SMS. Return ONLY JSON, no explanation:\n"
-            '{"amount": <float, 0 if declined/OTP/no transaction>, "type": "credit" or "debit", "date": "DD/MM/YY" or null}\n\n'
-            "credit=money in, debit=money out. Date format DD/MM/YY.\n\n"
+            '{"amount": <float in SAR. If foreign currency, multiply by exchange rate to get SAR. 0 if OTP/declined/no transaction>, '
+            '"type": "credit" or "debit", '
+            '"merchant": "<merchant name or empty string>", '
+            '"date": "DD/MM/YY" or null}\n\n'
+            "Rules:\n"
+            "- credit = money received, debit = money sent/spent\n"
+            "- If amount is in USD/EUR/other, convert to SAR using the exchange rate in the message\n"
+            "- merchant: extract the store/recipient name, empty string if not found\n"
+            "- OTP messages, declined transactions, notifications with no amount → amount: 0\n\n"
             f"{sms}"
         )
 
@@ -90,8 +97,10 @@ def _parse_with_claude(sms: str) -> dict | None:
                 y += 2000
             parsed_date = date(y, int(m), int(d))
 
-        logger.debug('Claude parser succeeded: amount=%s type=%s date=%s', amount, tx_type, parsed_date)
-        return {'amount': amount, 'type': tx_type, 'date': parsed_date}
+        merchant = str(data.get('merchant') or '').strip()
+
+        logger.debug('Claude parser succeeded: amount=%s type=%s merchant=%s date=%s', amount, tx_type, merchant, parsed_date)
+        return {'amount': amount, 'type': tx_type, 'merchant': merchant, 'date': parsed_date}
 
     except Exception as exc:
         logger.warning('Claude parser failed, falling back to regex: %s', exc)
@@ -229,15 +238,15 @@ def parse_sms(sms_text: str) -> dict | None:
     #   dict  → Claude responded; trust it completely
     #     amount > 0 → valid transaction
     #     amount = 0 → declined / OTP / not a transaction → return None immediately
-    from django.conf import settings as _settings
-    if getattr(_settings, 'USE_CLAUDE_PARSER', False):
+    from tracker.models import AppSettings
+    if AppSettings.get().use_claude_parser:
         claude_result = _parse_with_claude(sms)
         if claude_result is not None:
             if claude_result['amount'] > 0:
                 return {
                     'amount':   claude_result['amount'],
                     'type':     claude_result['type'],
-                    'merchant': '',
+                    'merchant': claude_result['merchant'],
                     'balance':  None,
                     'date':     claude_result['date'],
                     'raw_sms':  sms,

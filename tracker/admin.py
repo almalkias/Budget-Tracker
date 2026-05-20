@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance, AppSettings
 
 
 @admin.register(Transaction)
@@ -35,3 +35,14 @@ class BudgetCycleAdmin(admin.ModelAdmin):
 @admin.register(ReserveBalance)
 class ReserveBalanceAdmin(admin.ModelAdmin):
     list_display = ('balance', 'updated_at')
+
+
+@admin.register(AppSettings)
+class AppSettingsAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'use_claude_parser')
+
+    def has_add_permission(self, request):
+        return not AppSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
