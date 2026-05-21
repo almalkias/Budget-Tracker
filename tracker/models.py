@@ -1,30 +1,27 @@
 from django.db import models
 
 
+class Category(models.Model):
+    key   = models.CharField(max_length=100, unique=True)
+    label = models.CharField(max_length=200)
+    order = models.IntegerField(default=999)
+
+    class Meta:
+        verbose_name        = 'فئة'
+        verbose_name_plural = 'الفئات'
+        ordering            = ['order', 'key']
+
+    def __str__(self):
+        return f"{self.label} ({self.key})"
+
+
 class Transaction(models.Model):
-    CATEGORIES = [
-        ('supermarket', 'سوبر ماركت'),
-        ('clothes',     'ملابس وخياط'),
-        ('car',         'السيارة'),
-        ('food',        'مطاعم وتوصيل'),
-        ('pharmacy',    'صيدلية'),
-        ('bnpl',        'تابي وتمارا'),
-        ('cash',        'سحب كاش'),
-        ('family',      'تحويل للعائلة'),
-        ('reserve_in',  'تحويل الى الاحتياطي'),
-        ('reserve_out', 'تحويل من الاحتياطي'),
-        ('visa',        'تسديد الفيزا'),
-        ('maids',       'شغالات'),
-        ('school',      'طلبات مدرسة'),
-        ('laundry',     'مغسلة ملابس'),
-        ('maintenance', 'صيانة البيت'),
-    ]
     TYPES = [('debit', 'خصم'), ('credit', 'إيداع')]
 
     amount         = models.DecimalField(max_digits=10, decimal_places=2)
     type           = models.CharField(max_length=10, choices=TYPES)
     merchant       = models.CharField(max_length=200, blank=True)
-    category       = models.CharField(max_length=50, choices=CATEGORIES, default='other')
+    category       = models.CharField(max_length=100, default='other')
     is_categorized = models.BooleanField(default=False)
     is_skipped     = models.BooleanField(default=False)
     cycle          = models.ForeignKey('BudgetCycle', null=True, blank=True,
@@ -38,12 +35,11 @@ class Transaction(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.get_type_display()} {self.amount} ر.س — {self.merchant or self.get_category_display()}"
-
+        return f"{self.get_type_display()} {self.amount} ر.س — {self.merchant or self.category}"
 
 
 class CategoryBudget(models.Model):
-    category      = models.CharField(max_length=50, unique=True, choices=Transaction.CATEGORIES)
+    category      = models.CharField(max_length=100, unique=True)
     monthly_limit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     updated_at    = models.DateTimeField(auto_now=True)
 
@@ -57,7 +53,7 @@ class CategoryBudget(models.Model):
 
 class MerchantMemory(models.Model):
     merchant   = models.CharField(max_length=200, unique=True)
-    category   = models.CharField(max_length=50)
+    category   = models.CharField(max_length=100)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance, AppSettings
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance, AppSettings, Category
+
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display  = ('key', 'label', 'order')
+    search_fields = ('key', 'label')
+    ordering      = ('order', 'key')
 
 
 @admin.register(Transaction)

@@ -577,25 +577,14 @@
   </div>
 
   <script>
-    // ── Constants ──────────────────────────────────────────────
-    const CATEGORIES = [
-      { key: 'supermarket',  label: 'سوبر ماركت' },
-      { key: 'clothes',      label: 'ملابس وخياط' },
-      { key: 'car',          label: 'السيارة' },
-      { key: 'food',         label: 'مطاعم وتوصيل' },
-      { key: 'pharmacy',     label: 'صيدلية' },
-      { key: 'bnpl',         label: 'تابي وتمارا' },
-      { key: 'cash',         label: 'سحب كاش' },
-      { key: 'family',       label: 'تحويل للعائلة' },
-      { key: 'reserve_in',   label: 'تحويل الى الاحتياطي' },
-      { key: 'reserve_out',  label: 'تحويل من الاحتياطي' },
-      { key: 'visa',         label: 'تسديد الفيزا' },
-      { key: 'maids',        label: 'شغالات' },
-      { key: 'school',       label: 'طلبات مدرسة' },
-      { key: 'laundry',      label: 'مغسلة ملابس' },
-      { key: 'maintenance',  label: 'صيانة البيت' },
-    ];
-    const CAT_MAP = Object.fromEntries(CATEGORIES.map(c => [c.key, c.label]));
+    // ── Categories (populated from API on first load) ──────────
+    let CATEGORIES = [];
+    let CAT_MAP    = {};
+
+    function applyCategories(cats) {
+      CATEGORIES = cats;
+      CAT_MAP    = Object.fromEntries(cats.map(c => [c.key, c.label]));
+    }
 
     const MONTHS_AR = [
       '','يناير','فبراير','مارس','أبريل','مايو','يونيو',
@@ -785,12 +774,18 @@
       section.style.display = 'block';
       badge.textContent = pending.length;
 
-      const existing = new Set(
-        [...list.querySelectorAll('.pending-card')].map(el => el.dataset.id)
+      const existingCards = Object.fromEntries(
+        [...list.querySelectorAll('.pending-card')].map(el => [el.dataset.id, el])
       );
 
       pending.forEach(tx => {
-        if (existing.has(String(tx.id))) return;
+        const existingCard = existingCards[String(tx.id)];
+        if (existingCard) {
+          // أعد رسم الأزرار فقط لو تغير عدد الفئات (فئة مخصصة جديدة أُضيفت)
+          const currentBtnCount = existingCard.querySelectorAll('.cat-btn').length;
+          if (currentBtnCount === CATEGORIES.length + 1) return;
+          existingCard.remove();
+        }
 
         const isDebit    = tx.type === 'debit';
         const amountStr  = tx.amount > 0
@@ -951,7 +946,9 @@
     let splitTxId = null;
     let splitTotal = 0;
 
-    const catOptions = CATEGORIES.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
+    function buildCatOptions() {
+      return CATEGORIES.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
+    }
 
     function openSplit(id, amount) {
       splitTxId  = id;
@@ -978,7 +975,7 @@
           style="width:110px;padding:.4rem .6rem;border:1px solid var(--border);border-radius:.5rem;background:var(--bg);color:var(--text);font-family:inherit"
           oninput="updateRemaining()">
         <select style="flex:1;padding:.4rem .6rem;border:1px solid var(--border);border-radius:.5rem;background:var(--bg);color:var(--text);font-family:inherit">
-          ${catOptions}
+          ${buildCatOptions()}
         </select>
         <button onclick="this.parentElement.remove();updateRemaining()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>`;
       document.getElementById('split-rows').appendChild(row);
@@ -1048,6 +1045,8 @@
       document.getElementById('header-month-chart').textContent = ml;
       document.getElementById('header-month-table').textContent = ml;
       document.getElementById('last-update').textContent = new Date().toLocaleTimeString('ar-SA');
+
+      if (data.categories) applyCategories(data.categories);
 
       renderCycle(data.active_cycle);
       renderPending(data.pending);

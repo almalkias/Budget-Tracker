@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Sum
 
-from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance, Category
 from .services.parser import parse_sms
 
 logger = logging.getLogger('tracker')
@@ -176,6 +176,9 @@ def categorize_transaction(request, tx_id):
     delta = _category_delta(category, tx.amount) - _category_delta(old_category, tx.amount)
     if delta:
         _adjust_reserve(delta)
+
+    # حفظ الفئة لو لم تكن موجودة في جدول الفئات
+    Category.objects.get_or_create(key=category, defaults={'label': category})
 
     logger.info('Transaction categorized — id=%s category=%s cycle=%s', tx_id, category, active_cycle and active_cycle.pk)
     return JsonResponse({'status': 'ok'})
@@ -498,6 +501,8 @@ def dashboard_api(request):
             'closed_at':           c.closed_at.strftime('%Y-%m-%d') if c.closed_at else None,
         })
 
+    categories = list(Category.objects.order_by('order', 'key').values('key', 'label'))
+
     return JsonResponse({
         'month':         month,
         'year':          year,
@@ -507,6 +512,7 @@ def dashboard_api(request):
         'pending':       pending,
         'active_cycle':  active_cycle,
         'cycle_history': cycle_history,
+        'categories':    categories,
     })
 
 
