@@ -859,8 +859,12 @@
           pctEl.textContent = '—';
           pctEl.className   = 'value';
         } else {
-          pctEl.textContent = cycle.spending_percentage.toLocaleString('ar-SA') + '٪';
-          const p = cycle.spending_percentage;
+          const p        = cycle.spending_percentage;
+          const overSpend = cycle.total_expenses - cycle.salary;
+          const overHtml  = overSpend > 0
+            ? ` <span style="font-size:.85rem;color:var(--red);">(${fmt(overSpend)}+)</span>`
+            : '';
+          pctEl.innerHTML = cycle.spending_percentage.toLocaleString('ar-SA') + '٪' + overHtml;
           pctEl.className = 'value ' + (p > 90 ? 'spent' : p >= 70 ? 'pct-yellow' : 'pct-green');
         }
       } else {
