@@ -75,6 +75,16 @@ def _parse_with_claude(sms: str) -> dict | None:
             messages=[{'role': 'user', 'content': prompt}],
         )
 
+        # تجميع الـ tokens في AppSettings
+        try:
+            from tracker.models import AppSettings as _AS
+            _s = _AS.get()
+            _s.claude_input_tokens  += message.usage.input_tokens
+            _s.claude_output_tokens += message.usage.output_tokens
+            _s.save(update_fields=['claude_input_tokens', 'claude_output_tokens'])
+        except Exception as _e:
+            logger.warning('Failed to save Claude token usage: %s', _e)
+
         raw = message.content[0].text.strip()
         # Strip markdown code fences if present
         if raw.startswith('```'):

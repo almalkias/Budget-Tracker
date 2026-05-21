@@ -46,7 +46,8 @@ class ReserveBalanceAdmin(admin.ModelAdmin):
 
 @admin.register(AppSettings)
 class AppSettingsAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'use_claude_parser')
+    list_display  = ('__str__', 'use_claude_parser', 'claude_input_tokens', 'claude_output_tokens')
+    readonly_fields = ('claude_input_tokens', 'claude_output_tokens')
 
     def has_add_permission(self, request):
         return not AppSettings.objects.exists()

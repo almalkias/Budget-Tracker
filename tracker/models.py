@@ -105,6 +105,8 @@ class AppSettings(models.Model):
         verbose_name='استخدام Claude API للتحليل',
         help_text='فعّل لاستخدام Claude API بدل الـ Regex Parser',
     )
+    claude_input_tokens  = models.BigIntegerField(default=0)
+    claude_output_tokens = models.BigIntegerField(default=0)
 
     class Meta:
         verbose_name        = 'إعدادات التطبيق'

@@ -515,6 +515,10 @@
           <div class="label">رصيد الاحتياطي</div>
           <div class="value reserve-zero" id="reserve-balance">—</div>
         </div>
+        <div class="card" id="claude-cost-card" style="display:none">
+          <div class="label">تكلفة Claude (تقريبية)</div>
+          <div class="value" id="claude-cost" style="font-size:1.2rem;color:var(--muted)">—</div>
+        </div>
       </div>
       <div class="cycle-controls">
         <button class="btn btn-ghost" onclick="toggleEditBalance()">تعديل الراتب</button>
@@ -1047,6 +1051,14 @@
       document.getElementById('last-update').textContent = new Date().toLocaleTimeString('ar-SA');
 
       if (data.categories) applyCategories(data.categories);
+
+      const costCard = document.getElementById('claude-cost-card');
+      if (data.claude_cost !== null && data.claude_cost !== undefined) {
+        document.getElementById('claude-cost').textContent = '$' + data.claude_cost.toFixed(4);
+        costCard.style.display = 'block';
+      } else {
+        costCard.style.display = 'none';
+      }
 
       renderCycle(data.active_cycle);
       renderPending(data.pending);

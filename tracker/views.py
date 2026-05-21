@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Sum
 
-from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance, Category
+from .models import Transaction, CategoryBudget, BudgetCycle, MerchantMemory, ReserveBalance, Category, AppSettings
 from .services.parser import parse_sms
 
 logger = logging.getLogger('tracker')
@@ -503,6 +503,13 @@ def dashboard_api(request):
 
     categories = list(Category.objects.order_by('order', 'key').values('key', 'label'))
 
+    app_settings = AppSettings.get()
+    claude_cost = None
+    if app_settings.use_claude_parser:
+        input_cost  = app_settings.claude_input_tokens  / 1_000_000 * 3
+        output_cost = app_settings.claude_output_tokens / 1_000_000 * 15
+        claude_cost = round(input_cost + output_cost, 4)
+
     return JsonResponse({
         'month':         month,
         'year':          year,
@@ -513,6 +520,7 @@ def dashboard_api(request):
         'active_cycle':  active_cycle,
         'cycle_history': cycle_history,
         'categories':    categories,
+        'claude_cost':   claude_cost,
     })
 
 
