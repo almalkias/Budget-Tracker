@@ -197,6 +197,65 @@ def delete_transaction(request, tx_id):
     return JsonResponse({'status': 'deleted'})
 
 
+# ── POST /api/transactions/<id>/split/ ───────────────────────────────────────
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@api_login_required
+def split_transaction(request, tx_id):
+    tx = get_object_or_404(Transaction, pk=tx_id)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({'error': 'invalid json'}, status=400)
+
+    parts = body.get('parts', [])
+    if len(parts) < 2:
+        return JsonResponse({'error': 'need at least 2 parts'}, status=400)
+
+    active_cycle = BudgetCycle.objects.filter(status='active').first()
+    if not active_cycle:
+        return JsonResponse({'error': 'no active cycle'}, status=400)
+
+    try:
+        amounts = [Decimal(str(p['amount'])) for p in parts]
+        categories = [str(p['category']).strip() for p in parts]
+    except Exception:
+        return JsonResponse({'error': 'invalid parts'}, status=400)
+
+    if any(a <= 0 for a in amounts):
+        return JsonResponse({'error': 'amounts must be positive'}, status=400)
+
+    if abs(sum(amounts) - tx.amount) > Decimal('0.01'):
+        return JsonResponse({'error': f'parts sum {sum(amounts)} != original {tx.amount}'}, status=400)
+
+    for amount, category in zip(amounts, categories):
+        new_tx = Transaction.objects.create(
+            amount=amount,
+            type=tx.type,
+            merchant=tx.merchant,
+            category=category,
+            is_categorized=True,
+            cycle=active_cycle,
+            balance=None,
+            date=tx.date,
+            raw_sms=tx.raw_sms,
+        )
+        delta = _category_delta(category, amount)
+        if delta:
+            _adjust_reserve(delta)
+        if tx.merchant:
+            MerchantMemory.objects.update_or_create(
+                merchant=tx.merchant,
+                defaults={'category': categories[-1]},
+            )
+
+    tx.delete()
+    logger.info('Transaction split — id=%s into %s parts', tx_id, len(parts))
+    return JsonResponse({'status': 'split'})
+
+
 # ── POST /api/transactions/<id>/skip/ ────────────────────────────────────────
 
 @csrf_exempt

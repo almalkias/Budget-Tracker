@@ -26,6 +26,38 @@
       --red-bg:    #FDECEA;
     }
 
+    [data-theme="dark"] {
+      --bg:        #1A1A18;
+      --card:      #242422;
+      --border:    #333330;
+      --accent:    #D97757;
+      --accent-dk: #C4623E;
+      --text:      #EEEEE8;
+      --muted:     #888880;
+      --green:     #4ABA7A;
+      --green-bg:  #0F2A1A;
+      --yellow:    #D4A017;
+      --yellow-bg: #2A2000;
+      --red:       #E05A4A;
+      --red-bg:    #2A1010;
+    }
+
+    [data-theme="dark"] .cat-supermarket  { background:#0F2A1A; color:#4ABA7A; }
+    [data-theme="dark"] .cat-clothes      { background:#1E1A2E; color:#A78BFA; }
+    [data-theme="dark"] .cat-car          { background:#2A2000; color:#D4A017; }
+    [data-theme="dark"] .cat-food         { background:#2A1010; color:#F87171; }
+    [data-theme="dark"] .cat-pharmacy     { background:#0F2A1A; color:#4ABA7A; }
+    [data-theme="dark"] .cat-bnpl         { background:#2A0F1E; color:#F472B6; }
+    [data-theme="dark"] .cat-cash         { background:#2A2A28; color:#AAAAAA; }
+    [data-theme="dark"] .cat-family       { background:#1A1E2E; color:#93C5FD; }
+    [data-theme="dark"] .cat-reserve_in   { background:#0F2A1A; color:#4ABA7A; }
+    [data-theme="dark"] .cat-reserve_out  { background:#2A1010; color:#F87171; }
+    [data-theme="dark"] .cat-visa         { background:#0F2A1A; color:#4ABA7A; }
+    [data-theme="dark"] .cat-maids        { background:#2A1500; color:#FB923C; }
+    [data-theme="dark"] .cat-school       { background:#1A1E2E; color:#93C5FD; }
+    [data-theme="dark"] .cat-laundry      { background:#0F2A1A; color:#4ABA7A; }
+    [data-theme="dark"] .cat-maintenance  { background:#220F2A; color:#C084FC; }
+
     body {
       font-family: 'Tajawal', sans-serif;
       background: var(--bg);
@@ -109,8 +141,8 @@
       gap: .5rem;
       margin-bottom: .6rem;
       padding: .45rem .65rem;
-      background: #FFF8F5;
-      border: 1px solid #F5CDB8;
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: .5rem;
     }
     .suggestion-label { font-size: .8rem; color: var(--muted); white-space: nowrap; }
@@ -144,7 +176,7 @@
     }
     .btn-skip:hover { color: var(--yellow); border-color: var(--yellow); }
     .cat-btn {
-      background: #F5F4EF;
+      background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
       border-radius: .5rem;
@@ -311,7 +343,7 @@
       border-bottom: 1px solid var(--border);
     }
     tbody tr { border-top: 1px solid var(--border); }
-    tbody tr:hover { background: #FAFAF7; }
+    tbody tr:hover { background: var(--border); }
     tbody td { padding: .7rem 1rem; white-space: nowrap; }
     .badge { display: inline-block; padding: .15rem .6rem; border-radius: .4rem; font-size: .78rem; font-weight: 500; }
     .type-debit  { color: var(--red); }
@@ -410,10 +442,13 @@
         آخر تحديث: <span id="last-update">—</span>
       </div>
     </div>
-    <form method="post" action="/logout/" style="margin:0">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-ghost" style="font-size:.85rem;padding:.35rem .9rem">خروج</button>
-    </form>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <button onclick="toggleTheme()" class="btn btn-ghost" id="theme-btn" style="font-size:.85rem;padding:.35rem .9rem">🌙</button>
+      <form method="post" action="/logout/" style="margin:0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:.85rem;padding:.35rem .9rem">خروج</button>
+      </form>
+    </div>
   </header>
 
   <div id="error-msg"></div>
@@ -524,6 +559,21 @@
       <div id="cycle-history-list"></div>
     </div>
 
+  </div>
+
+  <!-- ── Split modal ─────────────────────────────────────────── -->
+  <div id="split-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:1rem;padding:1.5rem;width:min(480px,95vw);max-height:90vh;overflow-y:auto">
+      <div style="font-weight:700;font-size:1rem;margin-bottom:.25rem">تقسيم العملية</div>
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">المبلغ الأصلي: <span id="split-total" style="font-weight:700;color:var(--text)"></span> ر.س</div>
+      <div id="split-rows"></div>
+      <button onclick="addSplitRow()" class="btn btn-ghost" style="width:100%;margin-top:.5rem;font-size:.85rem">+ إضافة جزء</button>
+      <div style="margin-top:1rem;font-size:.85rem;color:var(--muted)">الباقي: <span id="split-remaining" style="font-weight:700"></span> ر.س</div>
+      <div style="display:flex;gap:.5rem;margin-top:1rem">
+        <button onclick="submitSplit()" class="btn btn-primary" style="flex:1">تأكيد التقسيم</button>
+        <button onclick="closeSplit()" class="btn btn-ghost" style="flex:1">إلغاء</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -781,7 +831,10 @@
           <pre class="pending-raw">${escapeHtml(tx.raw_sms || '')}</pre>
           ${suggHtml}
           <div class="cat-buttons">${btns}</div>
-          <button class="btn-skip" onclick="skipTransaction(${tx.id}, this.closest('.pending-card'))">تجاهل</button>`;
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <button class="btn-skip" onclick="skipTransaction(${tx.id}, this.closest('.pending-card'))">تجاهل</button>
+            <button class="btn-skip" style="color:var(--accent);border-color:var(--accent)" onclick="openSplit(${tx.id}, ${tx.amount})">تقسيم</button>
+          </div>`;
         list.appendChild(card);
       });
     }
@@ -892,6 +945,91 @@
           </div>`;
       });
     }
+
+    // ── Dark mode ──────────────────────────────────────────────
+    // ── Split ──────────────────────────────────────────────────
+    let splitTxId = null;
+    let splitTotal = 0;
+
+    const catOptions = CATEGORIES.map(c => `<option value="${c.key}">${c.label}</option>`).join('');
+
+    function openSplit(id, amount) {
+      splitTxId  = id;
+      splitTotal = amount;
+      document.getElementById('split-total').textContent = fmt(amount);
+      document.getElementById('split-rows').innerHTML = '';
+      addSplitRow();
+      addSplitRow();
+      updateRemaining();
+      const overlay = document.getElementById('split-overlay');
+      overlay.style.display = 'flex';
+    }
+
+    function closeSplit() {
+      document.getElementById('split-overlay').style.display = 'none';
+      splitTxId = null;
+    }
+
+    function addSplitRow() {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center';
+      row.innerHTML = `
+        <input type="number" placeholder="المبلغ" min="0.01" step="0.01"
+          style="width:110px;padding:.4rem .6rem;border:1px solid var(--border);border-radius:.5rem;background:var(--bg);color:var(--text);font-family:inherit"
+          oninput="updateRemaining()">
+        <select style="flex:1;padding:.4rem .6rem;border:1px solid var(--border);border-radius:.5rem;background:var(--bg);color:var(--text);font-family:inherit">
+          ${catOptions}
+        </select>
+        <button onclick="this.parentElement.remove();updateRemaining()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem">✕</button>`;
+      document.getElementById('split-rows').appendChild(row);
+    }
+
+    function updateRemaining() {
+      const inputs = document.querySelectorAll('#split-rows input[type=number]');
+      const used   = Array.from(inputs).reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+      const rem    = Math.round((splitTotal - used) * 100) / 100;
+      const el     = document.getElementById('split-remaining');
+      el.textContent = fmt(rem);
+      el.style.color = rem < 0 ? 'var(--red)' : rem === 0 ? 'var(--green)' : 'var(--text)';
+    }
+
+    async function submitSplit() {
+      const rows    = document.querySelectorAll('#split-rows > div');
+      const parts   = [];
+      for (const row of rows) {
+        const amount   = parseFloat(row.querySelector('input').value);
+        const category = row.querySelector('select').value;
+        if (!amount || amount <= 0) { alert('تأكد من إدخال مبالغ صحيحة'); return; }
+        parts.push({ amount, category });
+      }
+      const total = parts.reduce((s, p) => s + p.amount, 0);
+      if (Math.round((total - splitTotal) * 100) !== 0) {
+        alert('مجموع الأجزاء لا يساوي المبلغ الأصلي'); return;
+      }
+      const r = await fetch(`/api/transactions/${splitTxId}/split/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parts }),
+      });
+      if (r.ok) { closeSplit(); loadData(true); }
+      else { const e = await r.json(); alert('فشل التقسيم: ' + (e.error || 'خطأ غير معروف')); }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const next   = isDark ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('theme-btn').textContent = next === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem('theme', next);
+    }
+
+    (function () {
+      const saved = localStorage.getItem('theme') || 'light';
+      document.documentElement.setAttribute('data-theme', saved);
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('theme-btn').textContent = saved === 'dark' ? '☀️' : '🌙';
+      });
+    })();
 
     async function deleteCycle(id) {
       if (!confirm('هل أنت متأكد من حذف هذه الدورة؟')) return;
