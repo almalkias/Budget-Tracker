@@ -5,6 +5,8 @@ urlpatterns = [
     path('', views.dashboard_page, name='dashboard'),
     path('login/',  views.login_view,  name='login'),
     path('logout/', views.logout_view, name='logout'),
+    path('manifest.json', views.pwa_manifest,       name='pwa_manifest'),
+    path('sw.js',         views.pwa_service_worker, name='pwa_sw'),
     path('api/sms/', views.sms_webhook, name='sms_webhook'),
     path('api/dashboard/', views.dashboard_api, name='dashboard_api'),
     
