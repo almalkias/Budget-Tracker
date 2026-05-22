@@ -6,7 +6,7 @@ from functools import wraps
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -529,3 +529,76 @@ def dashboard_api(request):
 @login_required
 def dashboard_page(request):
     return render(request, 'dashboard.html')
+
+
+# ── PWA: manifest.json ────────────────────────────────────────────────────────
+
+def pwa_manifest(request):
+    manifest = {
+        "name": "مراقب الميزانية",
+        "short_name": "ميزانيتي",
+        "description": "تتبع مصروفاتك بذكاء",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#F5F4EF",
+        "theme_color": "#D97757",
+        "lang": "ar",
+        "dir": "rtl",
+        "icons": [
+            {
+                "src": "/static/tracker/icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any"
+            },
+            {
+                "src": "/static/tracker/icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable"
+            }
+        ]
+    }
+    return HttpResponse(
+        json.dumps(manifest, ensure_ascii=False, indent=2),
+        content_type='application/manifest+json'
+    )
+
+
+# ── PWA: service worker ───────────────────────────────────────────────────────
+
+def pwa_service_worker(request):
+    sw_js = """
+const CACHE = 'budget-tracker-v1';
+
+self.addEventListener('install', e => {
+  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(['/login/']))
+  );
+});
+
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('/api/') || e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
+});
+"""
+    return HttpResponse(sw_js, content_type='application/javascript')
